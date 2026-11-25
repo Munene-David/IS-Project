@@ -1,0 +1,370 @@
+@startuml Class_Diagram
+title Domestic Job Platform — Class Diagram
+
+skinparam classAttributeIconSize 0
+skinparam classFontSize 12
+skinparam classBackgroundColor #FAFAFA
+skinparam classBorderColor #555
+skinparam ArrowColor #333
+skinparam NoteBackgroundColor #FFFFCC
+skinparam linetype ortho
+
+' ══════════════════════════════════════════════════════
+'  USERS APP
+' ══════════════════════════════════════════════════════
+
+package "users" #EAF4FB {
+
+  class CustomUser {
+    + id : int
+    + username : str
+    + email : str
+    + first_name : str
+    + last_name : str
+    + role : RoleEnum  <<STUDENT|HOUSEHOLD|ADMIN>>
+    + phone_number : str
+    + created_at : datetime
+    ' Inherited from AbstractUser:
+    + password : str
+    + is_active : bool
+    + is_staff : bool
+    + last_login : datetime
+  }
+
+  class StudentProfile {
+    + university_id : str
+    + university_name : str
+    + verification_status : str  <<Pending|Verified|Rejected>>
+    + availability_status : bool
+    + categories_offered : list  <<JSONField>>
+    + location_lat : float
+    + location_lng : float
+    + cancellation_count : int
+    + reliability_score : float  <<default 1.0>>
+    + is_flagged : bool
+    --
+    + record_cancellation() : void
+  }
+
+  class HouseholdProfile {
+    + address : str
+    + location_lat : float
+    + location_lng : float
+    + verification_status : str  <<Pending|Verified|Rejected>>
+    + min_rating : float
+    + search_radius_km : float
+  }
+
+  class BlockedStudent {
+    + id : int
+  }
+
+  class Notification {
+    + notification_type : str
+    + title : str
+    + message : str
+    + is_read : bool
+    + task_id : int
+    + request_id : int
+    + created_at : datetime
+    --
+    + {static} send() : Notification
+  }
+
+  class LocationConsent {
+    + version : str
+    + consented_at : datetime
+  }
+}
+
+' ══════════════════════════════════════════════════════
+'  TASKS APP
+' ══════════════════════════════════════════════════════
+
+package "tasks" #EAF7EF {
+
+  enum TaskStatus {
+    Posted
+    Broadcasting
+    Matched
+    PaymentPending
+    Assigned
+    InProgress
+    AwaitingConfirmation
+    Completed
+    Cancelled
+    Disputed
+    Reopened
+    NoShow
+  }
+
+  enum TaskRequestStatus {
+    SENT
+    VIEWED
+    ACCEPTED
+    DECLINED
+    TAKEN
+    EXPIRED
+    IGNORED
+  }
+
+  enum CheckInType {
+    ARRIVAL
+    START
+    FINISH
+  }
+
+  enum CheckInResult {
+    VERIFIED
+    OUT_OF_RANGE
+    LOW_ACCURACY
+    LOCATION_DENIED
+    WRONG_CODE
+    FLAGGED_MOCK
+  }
+
+  class Task {
+    + id : int
+    + title : str
+    + description : str
+    + category : str
+    + posted_price : decimal
+    + recommended_price : decimal
+    + location_address : str
+    + location_lat : float
+    + location_lng : float
+    + location_landmark : str
+    + geofence_radius_m : int
+    + location_pin_confirmed : bool
+    + status : TaskStatus
+    + scheduled_date : date
+    + scheduled_time : time
+    + broadcast_round : int
+    + search_radius_km : float
+    + grace_window_deadline : datetime
+    + confirmation_deadline : datetime
+    + is_deleted : bool
+    + deleted_at : datetime
+  }
+
+  class TaskCompletion {
+    + start_code : str  <<4-digit>>
+    + start_code_verified : bool
+    + arrived_at : datetime
+    + started_at : datetime
+    + finished_at : datetime
+    + checkin_lat : float
+    + checkin_lng : float
+    + before_photo : ImageField
+    + after_photo : ImageField
+  }
+
+  class TaskRequest {
+    + id : int
+    + status : TaskRequestStatus
+    + sent_at : datetime
+    + responded_at : datetime
+    + broadcast_round : int
+    + rank_score : float
+  }
+
+  class Message {
+    + id : int
+    + content : str
+    + timestamp : datetime
+    + is_read : bool
+  }
+
+  class CheckIn {
+    + id : int
+    + type : CheckInType
+    + lat : float
+    + lng : float
+    + accuracy_m : float
+    + distance_m : float
+    + device_time : datetime
+    + server_time : datetime
+    + time_skew_seconds : float
+    + result : CheckInResult
+    + mock_location_flag : bool
+    + late_sync_flag : bool
+    + impossible_jump_flag : bool
+    + device_info : JSONField
+    + anonymised_at : datetime
+  }
+
+  class Dispute {
+    + id : int
+    + reason : str
+    + description : str
+    + student_response : str
+    + student_responded_at : datetime
+    + outcome : str  <<full_refund|partial_refund|release>>
+    + partial_refund_amount : decimal
+    + admin_notes : str
+    + resolved_at : datetime
+  }
+
+  class CancellationPolicy {
+    + free_before_hours : int  <<default 24>>
+    + partial_refund_pct : int  <<default 80>>
+    <<singleton>>
+  }
+
+  class LocationPolicy {
+    + allow_flagged_when_denied : bool
+    + retention_days : int
+    + low_accuracy_threshold_m : float
+    + max_time_skew_seconds : float
+    + max_speed_mps : float
+    <<singleton>>
+  }
+
+  class AuditLog {
+    + id : int
+    + action : str  <<transition|admin_decision|payment_event|dispute_event>>
+    + from_status : str
+    + to_status : str
+    + notes : str
+    + created_at : datetime
+    <<append-only>>
+  }
+
+  class PriceGuide {
+    + category : str  <<unique>>
+    + min_price : decimal
+    + max_price : decimal
+    + recommended_price : decimal
+  }
+}
+
+' ══════════════════════════════════════════════════════
+'  PAYMENTS APP
+' ══════════════════════════════════════════════════════
+
+package "payments" #FEF9E7 {
+
+  enum TransactionStatus {
+    PendingDeposit
+    Held
+    Released
+    Refunded
+    PartialRefund
+  }
+
+  enum LedgerTransactionType {
+    DEPOSIT
+    HOLD
+    RELEASE
+    REFUND
+    PARTIAL_REFUND
+  }
+
+  enum LedgerStatus {
+    PENDING
+    COMPLETED
+    FAILED
+    SIMULATED
+  }
+
+  class Transaction {
+    + id : int
+    + amount : decimal
+    + status : TransactionStatus
+    + mpesa_reference : str
+    + checkout_request_id : str
+    + phone_number : str
+    --
+    + mark_held() : void
+    + release_funds() : void
+    + refund() : void
+  }
+
+  class TransactionLedger {
+    + id : int
+    + amount : decimal
+    + transaction_type : LedgerTransactionType
+    + status : LedgerStatus
+    + mpesa_reference : str
+    + idempotency_key : UUID  <<unique>>
+    + notes : str
+    + created_at : datetime
+    <<append-only>>
+    --
+    + {static} record() : TransactionLedger
+  }
+
+  class Rating {
+    + id : int
+    + score : int  <<1-5>>
+    + comment : str
+    + created_at : datetime
+    --
+    + {static} calculate_average() : float
+    ' unique_together: (task, rater, rated_user)
+  }
+}
+
+' ══════════════════════════════════════════════════════
+'  INHERITANCE
+' ══════════════════════════════════════════════════════
+
+note "extends AbstractUser\n(Django built-in)" as N_AU
+CustomUser .. N_AU
+
+' ══════════════════════════════════════════════════════
+'  USERS RELATIONSHIPS
+' ══════════════════════════════════════════════════════
+
+CustomUser "1" *-- "0..1" StudentProfile    : user (OneToOne) >
+CustomUser "1" *-- "0..1" HouseholdProfile  : user (OneToOne) >
+CustomUser "1" *-- "0..1" LocationConsent   : student (OneToOne) >
+
+CustomUser "1" --o "0..*" Notification      : recipient >
+BlockedStudent "0..*" --> "1" CustomUser    : household >
+BlockedStudent "0..*" --> "1" CustomUser    : student >
+
+' ══════════════════════════════════════════════════════
+'  TASKS RELATIONSHIPS
+' ══════════════════════════════════════════════════════
+
+CustomUser "1" --o "0..*" Task             : household_owner >
+CustomUser "0..1" --o "0..*" Task          : assigned_student >
+
+Task "1" *-- "0..1" TaskCompletion         : task (OneToOne) >
+Task "1" --o "0..*" TaskRequest            : task >
+Task "1" --o "0..*" Message                : task >
+Task "1" --o "0..*" CheckIn               : task >
+Task "1" *-- "0..1" Dispute               : task (OneToOne) >
+Task "1" --o "0..*" AuditLog              : task >
+
+TaskRequest "0..*" --> "1" CustomUser      : student >
+Message "0..*" --> "1" CustomUser          : sender >
+Message "0..*" --> "1" CustomUser          : receiver >
+CheckIn "0..*" --> "1" CustomUser          : student >
+Dispute "0..*" --> "1" CustomUser          : raised_by >
+Dispute "0..*" --> "1" CustomUser          : resolved_by >
+AuditLog "0..*" --> "1" CustomUser         : actor >
+
+Task ..> TaskStatus                        : <<uses>>
+TaskRequest ..> TaskRequestStatus          : <<uses>>
+CheckIn ..> CheckInType                    : <<uses>>
+CheckIn ..> CheckInResult                  : <<uses>>
+
+' ══════════════════════════════════════════════════════
+'  PAYMENTS RELATIONSHIPS
+' ══════════════════════════════════════════════════════
+
+Task "1" *-- "0..1" Transaction            : task (OneToOne) >
+Task "1" --o "0..*" TransactionLedger      : task >
+Task "1" --o "0..*" Rating                 : task >
+
+Rating "0..*" --> "1" CustomUser           : rater >
+Rating "0..*" --> "1" CustomUser           : rated_user >
+TransactionLedger "0..*" --> "1" CustomUser: actor >
+
+Transaction ..> TransactionStatus          : <<uses>>
+TransactionLedger ..> LedgerTransactionType: <<uses>>
+TransactionLedger ..> LedgerStatus         : <<uses>>
+
+@enduml

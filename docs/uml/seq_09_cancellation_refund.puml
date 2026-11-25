@@ -1,0 +1,128 @@
+@startuml SEQ_09_Cancellation_Refund
+title Sequence 9 — Cancellation with Refund Policy
+
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFFFCC
+skinparam sequenceGroupBorderColor #888
+
+actor       "Household / Student"   as USER
+participant "Mobile App"            as App
+participant "TaskAPI\n/tasks/{id}/\ncancel/" as API
+participant "Task Model"            as TM
+participant "CancellationPolicy\nModel" as CP
+participant "StudentProfile Model"  as SP
+participant "BroadcastService"      as BS
+participant "RefundService"         as RS
+participant "Transaction Model"     as TX
+participant "TransactionLedger"     as TL
+participant "NotificationService"   as NS
+participant "AuditLog Model"        as AL
+database    "PostgreSQL"            as DB
+
+USER -> App  : Tap "Cancel Task"
+App  -> API  : POST /tasks/{T}/cancel/\n{cancelled_by: "household"|"student"}
+
+API  -> TM   : task = Task.objects.get(id=T)\nassert task.status in [Matched, Assigned]
+TM   -> DB   : SELECT tasks_task WHERE id=T
+DB  --> TM   : task row
+
+API  -> CP   : policy = CancellationPolicy.get_singleton()
+CP   -> DB   : SELECT tasks_cancellationpolicy
+DB  --> CP   : {free_before_hours: 24,\npartial_refund_pct: 80}
+
+API  -> API  : scheduled_dt = combine(\n  task.scheduled_date,\n  task.scheduled_time\n)\nhours_until = (scheduled_dt - now()) / 3600
+
+== Branch: Cancelled by HOUSEHOLD ==
+
+alt cancelled_by == "household"
+
+  alt hours_until > policy.free_before_hours  (> 24h away)
+    note over API : Full refund — cancellation within free window
+
+    API  -> RS   : refund(task=T, amount=full, type=REFUND)
+    RS   -> TX   : transaction.status = Refunded
+    TX   -> DB   : UPDATE payments_transaction
+    RS   -> TL   : TransactionLedger.record(\n  type=REFUND,\n  status=COMPLETED,\n  notes="HH cancelled >24h"\n)
+    TL   -> DB   : INSERT ledger row
+
+    API  -> NS   : send(recipient=ST, type=TASK_CANCELLED,\ntitle="Job cancelled",\nmessage="Full refund issued to household")
+    NS   -> DB   : INSERT notification
+
+  else hours_until <= policy.free_before_hours  (≤ 24h away)
+    note over API : Partial refund — 80% to household\n20% retained as compensation to student
+
+    API  -> API  : refund_amount\n  = task.posted_price * (policy.partial_refund_pct / 100)\nretained_amount\n  = task.posted_price - refund_amount
+
+    API  -> RS   : partial_refund(\n  task=T,\n  refund_amount=refund_amount,\n  release_amount=retained_amount\n)
+    RS   -> TX   : transaction.status = PartialRefund
+    TX   -> DB   : UPDATE payments_transaction
+    RS   -> TL   : TransactionLedger.record(\n  type=PARTIAL_REFUND,\n  amount=refund_amount,\n  notes="HH cancelled <24h — partial"\n)
+    TL   -> DB   : INSERT ledger row (partial refund)
+    RS   -> TL   : TransactionLedger.record(\n  type=RELEASE,\n  amount=retained_amount,\n  notes="Compensation to student"\n)
+    TL   -> DB   : INSERT ledger row (student compensation)
+
+    API  -> NS   : send(recipient=ST, type=TASK_CANCELLED,\ntitle="Job cancelled",\nmessage="Compensation of KES {retained} sent")
+    NS   -> DB   : INSERT notification
+
+    API  -> NS   : send(recipient=HH, type=TASK_CANCELLED,\ntitle="Cancellation processed",\nmessage="80% refund of KES {refund_amount}")
+    NS   -> DB   : INSERT notification
+  end
+
+  API  -> TM   : task.status = Cancelled\ntask.assigned_student = null
+  TM   -> DB   : UPDATE tasks_task SET status='Cancelled'
+
+end
+
+== Branch: Cancelled by STUDENT ==
+
+alt cancelled_by == "student"
+  note over API : Student cancellation always triggers\nfull refund to household + reliability penalty
+
+  API  -> RS   : refund(task=T, amount=full, type=REFUND)
+  RS   -> TX   : transaction.status = Refunded
+  TX   -> DB   : UPDATE payments_transaction
+  RS   -> TL   : TransactionLedger.record(\n  type=REFUND,\n  notes="Student cancelled"\n)
+  TL   -> DB   : INSERT ledger row
+
+  == Reliability Penalty ==
+
+  API  -> SP   : profile = StudentProfile.objects.get(\n  user=task.assigned_student\n)
+  SP   -> DB   : SELECT users_studentprofile
+  DB  --> SP   : profile
+
+  API  -> SP   : profile.record_cancellation()
+  note right of SP
+    cancellation_count += 1
+    reliability_score -= 0.1
+    flag if threshold exceeded
+  end note
+  SP   -> DB   : UPDATE users_studentprofile
+
+  == Re-broadcast Task ==
+
+  API  -> TM   : task.status = Posted\ntask.assigned_student = null\ntask.broadcast_round = 0
+  TM   -> DB   : UPDATE tasks_task SET status='Posted'
+
+  API  -> BS   : spawn thread → broadcast_task(task.id)
+  note right of BS
+    Task re-enters broadcast pipeline
+    (Sequence 2 repeated)
+  end note
+
+  API  -> NS   : send(recipient=HH, type=TASK_CANCELLED,\ntitle="Student cancelled",\nmessage="Full refund issued. Searching\nfor a new student.")
+  NS   -> DB   : INSERT notification
+
+  API  -> NS   : send(recipient=ST, type=CANCELLATION_PENALTY,\ntitle="Cancellation recorded",\nmessage="Reliability score penalised.")
+  NS   -> DB   : INSERT notification
+
+end
+
+== Audit Log ==
+
+API  -> AL   : AuditLog.objects.create(\n  task=T, actor=USER,\n  action=transition,\n  from_status=prev_status,\n  to_status=Cancelled,\n  notes="Cancelled by {role}"\n)
+AL   -> DB   : INSERT INTO tasks_auditlog
+
+API --> App  : 200 OK {task_status: Cancelled,\nrefund_type, refund_amount}
+App --> USER : "Task cancelled. Refund processing."
+
+@enduml

@@ -52,12 +52,9 @@ export default function TasksListScreen() {
       if (searchQuery) fetchParams.search = searchQuery;
       if (filterStatus) fetchParams.status = filterStatus;
 
-      // Household owners always see only their own tasks
-      // Students see all available tasks (not just their own)
-      if (isHousehold) {
-        fetchParams.my_tasks = true;
-      }
-
+      // Both households and students now get role-filtered results from the
+      // backend automatically — no need for my_tasks flag on default listing.
+      // We only use my_tasks explicitly when the user wants their personal view.
       const data = await api.tasks.list(fetchParams);
       setTasks(data);
     } catch (error: any) {
@@ -95,19 +92,23 @@ export default function TasksListScreen() {
     }
   };
 
-  // Student filter tabs
-  const studentFilters = ['', 'Posted', 'Bidding'];
+  // Student filter tabs — statuses relevant to their own tasks
+  const studentFilters = ['', 'Assigned', 'InProgress', 'AwaitingConfirmation', 'Completed'];
   // Household filter tabs
-  const householdFilters = ['', 'Posted', 'Bidding', 'Assigned', 'InProgress', 'Completed'];
+  const householdFilters = ['', 'Broadcasting', 'Matched', 'Assigned', 'InProgress', 'AwaitingConfirmation', 'Completed', 'Cancelled'];
 
   const filterOptions = isHousehold ? householdFilters : studentFilters;
   const filterLabels: Record<string, string> = {
     '': 'All',
+    Broadcasting: 'Searching',
+    Matched: 'Matched',
     Posted: 'Posted',
     Bidding: 'Bidding',
     Assigned: 'Assigned',
     InProgress: 'In Progress',
+    AwaitingConfirmation: 'Awaiting',
     Completed: 'Completed',
+    Cancelled: 'Cancelled',
   };
 
   const renderTask = ({ item }: { item: Task }) => {
@@ -201,7 +202,7 @@ export default function TasksListScreen() {
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
-          {isHousehold ? 'My Posted Tasks' : 'Available Tasks'}
+          {isHousehold ? 'My Tasks' : 'My Tasks'}
         </Text>
         {isHousehold && (
           <TouchableOpacity
@@ -251,13 +252,11 @@ export default function TasksListScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>
-              {isHousehold ? 'No tasks posted yet' : 'No tasks available'}
-            </Text>
+            <Text style={styles.emptyText}>No tasks yet</Text>
             <Text style={styles.emptySubtext}>
               {isHousehold
                 ? 'Post your first task to get started!'
-                : 'Check back soon for new opportunities'}
+                : 'Accept a task from Available Tasks to see it here.'}
             </Text>
             {isHousehold && (
               <TouchableOpacity

@@ -1,0 +1,149 @@
+@startuml Corrected_UseCaseDiagram
+title UniTask — Domestic Job & Escrow Platform\nUse Case Diagram
+
+skinparam backgroundColor #FFFFFF
+skinparam actorStyle awesome
+skinparam usecaseBackgroundColor #EBF5FB
+skinparam usecaseBorderColor #2980B9
+skinparam usecaseArrowColor #1A5276
+skinparam actorBorderColor #333333
+skinparam packageBackgroundColor #FDFEFE
+skinparam packageBorderColor #AAAAAA
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam usecaseFontSize 10
+skinparam actorFontSize 11
+skinparam defaultFontSize 10
+skinparam defaultFontName Arial
+skinparam linetype polyline
+
+top to bottom direction
+
+' ══ ACTORS (placed at extremes so lines stay clean) ═══════════
+actor "Household\nOwner"    as HH  #D6EAF8
+actor "Student"             as ST  #D5F5E3
+actor "Administrator"       as AD  #FADBD8
+actor "Scheduler\n(Cron)"   as SC  #E8DAEF
+actor "M-Pesa\n(Safaricom)" as MP  #FDEBD0
+
+' ══ SYSTEM BOUNDARY ═══════════════════════════════════════════
+rectangle "UniTask — Domestic Job & Escrow Platform" {
+
+  ' Row 1 — shared auth
+  package "Authentication & Profile" #EAF4FB {
+    usecase "Register Account"         as UC01
+    usecase "Login"                    as UC02
+    usecase "View & Edit Profile"      as UC03
+    usecase "View My Ratings"          as UC04
+    usecase "View Payment History"     as UC05
+  }
+
+  ' Row 2 — household tasks  |  student tasks
+  package "Task Management (Household)" #EAFAF1 {
+    usecase "Post New Task"              as UC07
+    usecase "View My Tasks"              as UC09
+    usecase "Confirm Match & Pay Escrow" as UC10
+    usecase "View Start Code"            as UC11
+    usecase "Confirm Work Complete"      as UC12
+    usecase "Raise Dispute"              as UC13
+    usecase "Cancel Task"                as UC14
+    usecase "Rate Student"               as UC16
+  }
+
+  package "Task Management (Student)" #FEF9E7 {
+    usecase "View Available Tasks"       as UC17
+    usecase "Accept Task"                as UC18
+    usecase "Decline / Ignore Task"      as UC19
+    usecase "Check In (Code + GPS)"      as UC20
+    usecase "Mark Work Finished"         as UC21
+    usecase "Respond to Dispute"         as UC22
+    usecase "Cancel Accepted Task"       as UC23
+    usecase "Rate Household"             as UC24
+    usecase "Accept Location Consent"    as UC06
+  }
+
+  ' Row 3 — payments  |  admin
+  package "Payments & Escrow" #FDF2E9 {
+    usecase "Initiate M-Pesa STK Push"   as UC25
+    usecase "Process Payment Callback"   as UC26
+    usecase "Hold Funds in Escrow"       as UC27
+    usecase "Release Escrow to Student"  as UC28
+    usecase "Refund Escrow to Household" as UC29
+  }
+
+  package "Administration" #FDEDEC {
+    usecase "Verify Student Account"     as UC30
+    usecase "Resolve Dispute"            as UC31
+    usecase "View Location Audit Map"    as UC32
+    usecase "Manage Platform Policies"   as UC33
+    usecase "View Audit Logs"            as UC34
+  }
+
+  ' Row 4 — automated
+  package "Automated Jobs (Scheduler)" #F5EEF8 {
+    usecase "Broadcast Task to Students" as UC35
+    usecase "Detect No-Show (30 min)"    as UC36
+    usecase "Auto-Release Escrow (48h)"  as UC37
+    usecase "Anonymise Location Data"    as UC38
+  }
+}
+
+' ══ HOUSEHOLD ASSOCIATIONS ════════════════════════════════════
+HH --> UC01
+HH --> UC02
+HH --> UC03
+HH --> UC04
+HH --> UC05
+HH --> UC07
+HH --> UC09
+HH --> UC10
+HH --> UC11
+HH --> UC12
+HH --> UC13
+HH --> UC14
+HH --> UC16
+
+' ══ STUDENT ASSOCIATIONS ══════════════════════════════════════
+ST --> UC01
+ST --> UC02
+ST --> UC03
+ST --> UC04
+ST --> UC05
+ST --> UC06
+ST --> UC17
+ST --> UC18
+ST --> UC19
+ST --> UC20
+ST --> UC21
+ST --> UC22
+ST --> UC23
+ST --> UC24
+
+' ══ ADMIN ASSOCIATIONS ════════════════════════════════════════
+AD --> UC30
+AD --> UC31
+AD --> UC33
+AD --> UC34
+
+' ══ SCHEDULER ASSOCIATIONS ════════════════════════════════════
+SC --> UC35
+SC --> UC36
+SC --> UC37
+SC --> UC38
+
+' ══ M-PESA ASSOCIATIONS ═══════════════════════════════════════
+UC10 --> MP : STK Push
+MP  --> UC26 : Callback
+
+' ══ INCLUDE / EXTEND ══════════════════════════════════════════
+UC20  ..> UC06 : <<include>>
+UC10  ..> UC25 : <<include>>
+UC25  ..> UC27 : <<include>>
+UC26  ..> UC27 : <<include>>
+UC12  ..> UC28 : <<include>>
+UC37  ..> UC28 : <<include>>
+UC31  ..> UC32 : <<include>>
+UC36  ..> UC29 : <<extend>>
+UC14  ..> UC29 : <<extend>>
+
+@enduml

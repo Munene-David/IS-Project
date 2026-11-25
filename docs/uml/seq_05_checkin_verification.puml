@@ -1,0 +1,114 @@
+@startuml SEQ_05_CheckIn_Verification
+title Sequence 5 — Check-In Verification
+
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFFFCC
+skinparam sequenceGroupBorderColor #888
+
+actor       "Student"               as ST
+participant "Mobile App"            as App
+participant "TaskAPI\n/tasks/{id}/\ncheckin/" as API
+participant "LocationConsent\nModel" as LC
+participant "TaskCompletion\nModel"  as TC
+participant "GeoService\ngeo.evaluate_checkin()" as GEO
+participant "LocationPolicy\nModel"  as LP
+participant "CheckIn Model"         as CI
+participant "Task Model"            as TM
+participant "NotificationService"   as NS
+database    "PostgreSQL"            as DB
+
+ST  -> App  : Arrive at job site\nTap "Check In"\nApp collects GPS coords
+
+App -> API  : POST /tasks/{T}/checkin/\n{\n  start_code: "7342",\n  lat: -1.2921,\n  lng: 36.8219,\n  accuracy_m: 12.5,\n  device_time: "…",\n  mock_flag: false\n}
+
+== Consent Check ==
+
+API -> LC   : LocationConsent.objects.filter(student=ST).exists()
+LC  -> DB   : SELECT FROM users_locationconsent
+DB --> LC   : result
+
+alt No consent on record
+  API --> App : 403 Forbidden\n{"detail": "Location consent required"}
+  App --> ST  : Prompt consent screen
+  note right : Student must grant\nlocation consent\nbefore first check-in
+end
+
+== Start Code Validation ==
+
+API -> TC   : completion = TaskCompletion.objects.get(task=T)
+TC  -> DB   : SELECT FROM tasks_taskcompletion
+DB --> TC   : completion row (start_code='7342')
+
+alt start_code mismatch
+  API -> CI : CheckIn.objects.create(\n  result=WRONG_CODE, type=START, …)
+  CI  -> DB : INSERT INTO tasks_checkin
+  API --> App : 400 Bad Request\n{"detail": "Invalid start code"}
+  App --> ST  : "Wrong code. Please check with the household."
+end
+
+== Geo Evaluation ==
+
+API -> LP   : policy = LocationPolicy.get_singleton()
+LP  -> DB   : SELECT FROM tasks_locationpolicy
+DB --> LP   : policy (geofence rules)
+
+API -> GEO  : evaluate_checkin(\n  student_lat, student_lng,\n  task_lat, task_lng,\n  accuracy_m,\n  geofence_radius_m=task.geofence_radius_m,\n  policy=policy,\n  mock_flag=false\n)
+
+GEO -> GEO  : distance_m = haversine(student, task)
+GEO -> GEO  : Check accuracy_m < policy.low_accuracy_threshold_m
+GEO -> GEO  : Check mock_location_flag
+GEO -> GEO  : Check impossible_jump (speed from last known pos)
+GEO -> GEO  : Determine result
+
+alt result == VERIFIED
+  GEO --> API : {result: VERIFIED, distance_m: 45}
+  
+  API -> CI   : CheckIn.objects.create(\n  task=T, student=ST,\n  type=START, result=VERIFIED,\n  lat, lng, accuracy_m,\n  distance_m, server_time=now()\n)
+  CI  -> DB   : INSERT INTO tasks_checkin
+
+  API -> TM   : task.status = InProgress
+  TM  -> DB   : UPDATE tasks_task SET status='InProgress'
+
+  API -> TC   : completion.start_code_verified = True\ncompletion.started_at = now()
+  TC  -> DB   : UPDATE tasks_taskcompletion
+
+  API -> NS   : send(\n  recipient=HH,\n  type=STUDENT_ARRIVED,\n  title="Student has checked in",\n  message="Job started at {time}"\n)
+  NS  -> DB   : INSERT notification
+
+  API --> App : 200 OK\n{result: VERIFIED, task_status: InProgress}
+  App --> ST  : "Check-in verified! Job started."
+
+else result == OUT_OF_RANGE
+  GEO --> API : {result: OUT_OF_RANGE, distance_m: 320}
+  API -> CI   : CheckIn.objects.create(result=OUT_OF_RANGE, …)
+  CI  -> DB   : INSERT
+  API --> App : 200 OK\n{result: OUT_OF_RANGE,\ndistance_m: 320,\nmessage: "You are 320 m from the job site"}
+  App --> ST  : "You're too far. Move closer and try again."
+
+else result == LOW_ACCURACY
+  GEO --> API : {result: LOW_ACCURACY}
+  API -> CI   : CheckIn.objects.create(result=LOW_ACCURACY, …)
+  CI  -> DB   : INSERT
+  API --> App : 200 OK\n{result: LOW_ACCURACY}
+  App --> ST  : "GPS accuracy too low. Move to open area."
+
+else result == FLAGGED_MOCK
+  GEO --> API : {result: FLAGGED_MOCK}
+  API -> CI   : CheckIn.objects.create(\n  result=FLAGGED_MOCK,\n  mock_location_flag=true, …)
+  CI  -> DB   : INSERT
+  API --> App : 400 Bad Request\n{result: FLAGGED_MOCK}
+  App --> ST  : "Mock/fake GPS detected. Please disable."
+
+else result == LOCATION_DENIED
+  GEO --> API : {result: LOCATION_DENIED}
+  API -> LP   : check policy.allow_flagged_when_denied
+  alt policy allows degraded check-in
+    API -> CI : CheckIn(result=LOCATION_DENIED, …)
+    ' proceed with limited verification
+  else policy blocks
+    API --> App : 403 Forbidden {result: LOCATION_DENIED}
+    App --> ST  : "Location access required for check-in."
+  end
+end
+
+@enduml

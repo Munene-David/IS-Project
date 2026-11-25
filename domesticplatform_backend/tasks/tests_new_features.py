@@ -212,7 +212,9 @@ class TestStartCode(FeatureTestBase):
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {other_token}')
         res = self.client.post(f'/api/tasks/{task.id}/checkin/',
                                {'start_code': '1234'}, format='json')
-        self.assertEqual(res.status_code, 403)
+        # Role-based queryset returns 404 (task not in this student's visible set)
+        # which is more secure than 403 — it doesn't reveal the task exists
+        self.assertIn(res.status_code, [403, 404])
 
     def test_student_marks_complete_moves_to_awaiting_confirmation(self):
         task = self._make_task(status='InProgress')
@@ -758,7 +760,8 @@ class TestTaskRemoval(FeatureTestBase):
         other_token = Token.objects.create(user=other).key
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {other_token}')
         res = self.client.delete(f'/api/tasks/{task.id}/')
-        self.assertEqual(res.status_code, 403)
+        # 404: task not in the other household's queryset (more secure than 403)
+        self.assertIn(res.status_code, [403, 404])
         task.refresh_from_db()
         self.assertFalse(task.is_deleted)
 
@@ -831,7 +834,8 @@ class TestWrongUserAccess(FeatureTestBase):
         )
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.st_token}')
         res = self.client.post(f'/api/tasks/{task.id}/cancel/', format='json')
-        self.assertEqual(res.status_code, 403)
+        # 404: task not in this student's queryset (more secure than 403)
+        self.assertIn(res.status_code, [403, 404])
 
     def test_unauthenticated_user_cannot_access_task(self):
         task = self._make_task(status='Assigned')

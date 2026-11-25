@@ -1,0 +1,338 @@
+Creating test database for alias 'default' ('test_domesticplatform_db')...
+
+Found 232 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: corsheaders, messages, rest_framework, staticfiles
+  Apply all migrations: admin, auth, authtoken, contenttypes, payments, sessions, tasks, users
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying users.0001_initial... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying authtoken.0001_initial... OK
+  Applying authtoken.0002_auto_20160226_1747... OK
+  Applying authtoken.0003_tokenproxy... OK
+  Applying authtoken.0004_alter_tokenproxy_options... OK
+  Applying tasks.0001_initial... OK
+  Applying tasks.0002_broadcast_matching... OK
+  Applying tasks.0003_remove_bid_model... OK
+  Applying tasks.0004_cancellationpolicy_task_confirmation_deadline_and_more... OK
+  Applying payments.0001_initial... OK
+  Applying payments.0002_alter_transaction_status_transactionledger... OK
+  Applying sessions.0001_initial... OK
+  Applying tasks.0005_alter_taskrequest_status... OK
+  Applying tasks.0006_locationpolicy_task_geofence_radius_m_and_more... OK
+  Applying users.0002_customuser_created_at_alter_customuser_phone_number_and_more... OK
+  Applying users.0003_remove_phone_unique_constraint... OK
+  Applying users.0004_add_notification_model... OK
+  Applying users.0005_broadcast_matching... OK
+  Applying users.0006_alter_notification_notification_type... OK
+test_full_marketplace_workflow (tasks.tests.MarketplaceEndToEndTests.test_full_marketplace_workflow) ... ok
+test_student_does_not_see_full_address_before_payment (tasks.tests.TestAddressHiding.test_student_does_not_see_full_address_before_payment) ... ok
+test_broadcast_creates_requests_for_top_n (tasks.tests.TestBroadcastAndAccept.test_broadcast_creates_requests_for_top_n)
+broadcast_task should create SENT TaskRequests for eligible students. ... ok
+test_my_requests_endpoint (tasks.tests.TestBroadcastAndAccept.test_my_requests_endpoint)
+Student should see their available requests via API. ... ok
+test_student_accepts_task (tasks.tests.TestBroadcastAndAccept.test_student_accepts_task)
+First student to accept should get the task. ... ok
+test_admin_setting_allows_flagged_checkin_when_denied (tasks.tests.TestCheckInDenied.test_admin_setting_allows_flagged_checkin_when_denied) ... ok
+test_denied_permission_blocks_checkin (tasks.tests.TestCheckInDenied.test_denied_permission_blocks_checkin) ... ok
+test_low_accuracy_is_flagged_but_starts (tasks.tests.TestCheckInLowAccuracy.test_low_accuracy_is_flagged_but_starts) ... ok
+test_mock_location_is_rejected (tasks.tests.TestCheckInMockLocation.test_mock_location_is_rejected) ... ok
+test_flagged_checkin_can_retry_to_verified (tasks.tests.TestCheckInOutOfRange.test_flagged_checkin_can_retry_to_verified) ... ok
+test_no_retry_needed_after_verified (tasks.tests.TestCheckInOutOfRange.test_no_retry_needed_after_verified) ... ok
+test_out_of_range_checkin_is_flagged_but_starts (tasks.tests.TestCheckInOutOfRange.test_out_of_range_checkin_is_flagged_but_starts) ... ok
+test_verified_checkin_starts_task (tasks.tests.TestCheckInVerified.test_verified_checkin_starts_task) ... ok
+test_verified_checkin_within_radius (tasks.tests.TestCheckInVerified.test_verified_checkin_within_radius) ... ok
+test_api_accept_endpoint_returns_409_for_taken (tasks.tests.TestConcurrentAcceptanceRace.test_api_accept_endpoint_returns_409_for_taken) ... ok
+test_second_student_cannot_accept_same_task (tasks.tests.TestConcurrentAcceptanceRace.test_second_student_cannot_accept_same_task)
+When student A accepts, student B's request becomes TAKEN and ... ok
+test_checkin_blocked_without_consent (tasks.tests.TestConsentRequired.test_checkin_blocked_without_consent) ... ok
+test_consent_endpoint_records_and_reports (tasks.tests.TestConsentRequired.test_consent_endpoint_records_and_reports) ... ok
+test_student_cannot_accept_overlapping_tasks (tasks.tests.TestDoubleBooking.test_student_cannot_accept_overlapping_tasks)
+A student who accepted a task for a date should not appear in ... ok
+test_excludes_blocked_students (tasks.tests.TestFindEligibleStudents.test_excludes_blocked_students) ... ok
+test_excludes_students_not_offering_category (tasks.tests.TestFindEligibleStudents.test_excludes_students_not_offering_category) ... ok
+test_excludes_students_outside_radius (tasks.tests.TestFindEligibleStudents.test_excludes_students_outside_radius) ... ok
+test_excludes_unverified_students (tasks.tests.TestFindEligibleStudents.test_excludes_unverified_students) ... ok
+test_finds_verified_active_students_offering_category (tasks.tests.TestFindEligibleStudents.test_finds_verified_active_students_offering_category) ... ok
+test_cancel_match_via_api (tasks.tests.TestGraceWindowCancellation.test_cancel_match_via_api) ... ok
+test_household_cancels_and_blocks_student (tasks.tests.TestGraceWindowCancellation.test_household_cancels_and_blocks_student) ... ok
+test_household_cancels_match (tasks.tests.TestGraceWindowCancellation.test_household_cancels_match) ... ok
+test_impossible_jump_flagged (tasks.tests.TestImpossibleJump.test_impossible_jump_flagged) ... ok
+test_household_sees_exact_location (tasks.tests.TestLocationAccessControl.test_household_sees_exact_location) ... ok
+test_household_summary_has_no_raw_coordinates (tasks.tests.TestLocationAccessControl.test_household_summary_has_no_raw_coordinates) ... ok
+test_location_audit_is_admin_only (tasks.tests.TestLocationAccessControl.test_location_audit_is_admin_only) ... ok
+test_student_sees_approximate_location_until_paid (tasks.tests.TestLocationAccessControl.test_student_sees_approximate_location_until_paid) ... ok
+test_student_sees_exact_location_after_payment (tasks.tests.TestLocationAccessControl.test_student_sees_exact_location_after_payment) ... ok
+test_unrelated_student_sees_approximate_in_list (tasks.tests.TestLocationAccessControl.test_unrelated_student_sees_approximate_in_list) ... ok
+test_get_policy (tasks.tests.TestLocationPolicyEndpoint.test_get_policy) ... ok
+test_patch_policy_admin_only (tasks.tests.TestLocationPolicyEndpoint.test_patch_policy_admin_only) ... ok
+test_coordinates_kept_while_dispute_is_open (tasks.tests.TestLocationRetentionJob.test_coordinates_kept_while_dispute_is_open) ... ok
+test_old_coordinates_are_anonymised (tasks.tests.TestLocationRetentionJob.test_old_coordinates_are_anonymised) ... ok
+test_recent_coordinates_are_kept (tasks.tests.TestLocationRetentionJob.test_recent_coordinates_are_kept) ... ok
+test_retention_period_is_configurable (tasks.tests.TestLocationRetentionJob.test_retention_period_is_configurable) ... ok
+test_verified_checkin_prevents_no_show (tasks.tests.TestNoShowRequiresVerified.test_verified_checkin_prevents_no_show) ... ok
+test_wrong_code_attempts_still_count_as_no_show (tasks.tests.TestNoShowRequiresVerified.test_wrong_code_attempts_still_count_as_no_show) ... ok
+test_late_sync_flagged (tasks.tests.TestOfflineLateSync.test_late_sync_flagged) ... ok
+test_time_skew_recorded (tasks.tests.TestOfflineLateSync.test_time_skew_recorded) ... ok
+test_household_cannot_accept_request (tasks.tests.TestPermissions.test_household_cannot_accept_request) ... ok
+test_household_settings_endpoints (tasks.tests.TestPermissions.test_household_settings_endpoints) ... ok
+test_student_cannot_cancel_match (tasks.tests.TestPermissions.test_student_cannot_cancel_match) ... ok
+test_student_cannot_confirm_match (tasks.tests.TestPermissions.test_student_cannot_confirm_match) ... ok
+test_post_with_confirmed_pin_succeeds (tasks.tests.TestPinRequiredToPost.test_post_with_confirmed_pin_succeeds) ... ok
+test_post_without_pin_is_accepted (tasks.tests.TestPinRequiredToPost.test_post_without_pin_is_accepted)
+Posting without a pin now succeeds ù pin is optional. ... ok
+test_decline_request_via_api (tasks.tests.TestRequestActions.test_decline_request_via_api) ... ok
+test_ignore_request_via_api (tasks.tests.TestRequestActions.test_ignore_request_via_api) ... ok
+test_ignored_request_cannot_be_accepted (tasks.tests.TestRequestActions.test_ignored_request_cannot_be_accepted) ... ok
+test_task_detail_exposes_my_request (tasks.tests.TestRequestActions.test_task_detail_exposes_my_request) ... ok
+test_task_request_notification_carries_request_id (tasks.tests.TestRequestActions.test_task_request_notification_carries_request_id) ... ok
+test_round1_requests_expire_in_round2 (tasks.tests.TestRequestExpiry.test_round1_requests_expire_in_round2) ... ok
+test_student_cancel_lowers_reliability (tasks.tests.TestStudentReliability.test_student_cancel_lowers_reliability) ... ok
+test_three_cancellations_flags_student (tasks.tests.TestStudentReliability.test_three_cancellations_flags_student) ... ok
+test_wrong_code_records_attempt_but_does_not_start (tasks.tests.TestWrongCodeWithCorrectLocation.test_wrong_code_records_attempt_but_does_not_start) ... ok
+test_auto_release_completes_overdue_awaiting_confirmation (tasks.tests_new_features.TestAutoRelease.test_auto_release_completes_overdue_awaiting_confirmation)
+ScheduledCmd should release payment for overdue AwaitingConfirmation tasks. ... ok
+test_auto_release_does_not_affect_non_overdue (tasks.tests_new_features.TestAutoRelease.test_auto_release_does_not_affect_non_overdue) ... ok
+test_auto_release_is_idempotent_via_uuid5 (tasks.tests_new_features.TestAutoRelease.test_auto_release_is_idempotent_via_uuid5)
+Running auto-release twice on same task should not double-release. ... ok
+test_cancellation_blocked_disputed (tasks.tests_new_features.TestCancellationPolicy.test_cancellation_blocked_disputed) ... ok
+test_cancellation_blocked_in_progress (tasks.tests_new_features.TestCancellationPolicy.test_cancellation_blocked_in_progress)
+Cannot cancel an InProgress task. ... ok
+test_cancellation_free_before_payment (tasks.tests_new_features.TestCancellationPolicy.test_cancellation_free_before_payment)
+Cancelling a Posted task has no charge. ... ok
+test_cancellation_full_refund_gt_free_hours (tasks.tests_new_features.TestCancellationPolicy.test_cancellation_full_refund_gt_free_hours)
+Household cancels Assigned task >24h before scheduled start \u2192 full refund. ... ok
+test_cancellation_partial_refund_lt_free_hours (tasks.tests_new_features.TestCancellationPolicy.test_cancellation_partial_refund_lt_free_hours)
+Household cancels Assigned task <24h before scheduled start \u2192 partial refund. ... ok
+test_cancellation_policy_configurable (tasks.tests_new_features.TestCancellationPolicy.test_cancellation_policy_configurable)
+Admin can update the cancellation policy. ... ok
+test_non_admin_cannot_update_policy (tasks.tests_new_features.TestCancellationPolicy.test_non_admin_cannot_update_policy) ... ok
+test_student_cancel_full_refund_and_reliability_penalty (tasks.tests_new_features.TestCancellationPolicy.test_student_cancel_full_refund_and_reliability_penalty)
+Student cancels \u2192 full refund + reliability lowered. ... ok
+test_admin_resolves_full_refund (tasks.tests_new_features.TestDisputes.test_admin_resolves_full_refund) ... ok
+test_admin_resolves_release_to_student (tasks.tests_new_features.TestDisputes.test_admin_resolves_release_to_student) ... ok
+test_dispute_detail_accessible_to_parties (tasks.tests_new_features.TestDisputes.test_dispute_detail_accessible_to_parties) ... ok
+test_dispute_detail_blocked_for_third_party (tasks.tests_new_features.TestDisputes.test_dispute_detail_blocked_for_third_party) ... ok
+test_dispute_requires_reason_and_description (tasks.tests_new_features.TestDisputes.test_dispute_requires_reason_and_description) ... ok
+test_household_raises_dispute (tasks.tests_new_features.TestDisputes.test_household_raises_dispute) ... ok
+test_non_admin_cannot_resolve_dispute (tasks.tests_new_features.TestDisputes.test_non_admin_cannot_resolve_dispute) ... ok
+test_one_dispute_per_task (tasks.tests_new_features.TestDisputes.test_one_dispute_per_task) ... ok
+test_student_can_respond_to_dispute (tasks.tests_new_features.TestDisputes.test_student_can_respond_to_dispute) ... ok
+test_student_cannot_raise_dispute (tasks.tests_new_features.TestDisputes.test_student_cannot_raise_dispute) ... ok
+test_student_cannot_respond_twice (tasks.tests_new_features.TestDisputes.test_student_cannot_respond_twice) ... ok
+test_double_refund_is_idempotent (tasks.tests_new_features.TestIdempotency.test_double_refund_is_idempotent)
+Calling refund_to_household twice with the same idempotency key ... ok
+test_double_release_is_idempotent (tasks.tests_new_features.TestIdempotency.test_double_release_is_idempotent) ... ok
+test_ledger_entries_never_deleted (tasks.tests_new_features.TestLedger.test_ledger_entries_never_deleted)
+Soft-deleting the task should not destroy ledger entries. ... ok
+test_ledger_entries_visible_to_household (tasks.tests_new_features.TestLedger.test_ledger_entries_visible_to_household) ... ok
+test_ledger_not_visible_to_student (tasks.tests_new_features.TestLedger.test_ledger_not_visible_to_student) ... ok
+test_no_show_flagged_when_student_does_not_check_in (tasks.tests_new_features.TestNoShow.test_no_show_flagged_when_student_does_not_check_in)
+ScheduledCmd should flag no-show 30 min after scheduled start. ... ok
+test_no_show_not_flagged_before_window (tasks.tests_new_features.TestNoShow.test_no_show_not_flagged_before_window)
+Do not flag if the window hasn't passed yet. ... ok
+test_no_show_not_flagged_if_student_checked_in (tasks.tests_new_features.TestNoShow.test_no_show_not_flagged_if_student_checked_in)
+Don't flag if the student already verified the start code. ... ok
+test_audit_log_records_every_transition (tasks.tests_new_features.TestStartCode.test_audit_log_records_every_transition) ... ok
+test_checkin_records_gps_coordinates (tasks.tests_new_features.TestStartCode.test_checkin_records_gps_coordinates) ... ok
+test_household_can_view_start_code_when_assigned (tasks.tests_new_features.TestStartCode.test_household_can_view_start_code_when_assigned) ... ok
+test_household_confirmation_creates_ledger_release_entry (tasks.tests_new_features.TestStartCode.test_household_confirmation_creates_ledger_release_entry) ... ok
+test_household_confirms_completion_releases_escrow (tasks.tests_new_features.TestStartCode.test_household_confirms_completion_releases_escrow) ... ok
+test_start_code_not_visible_before_assigned (tasks.tests_new_features.TestStartCode.test_start_code_not_visible_before_assigned) ... ok
+test_student_cannot_view_start_code (tasks.tests_new_features.TestStartCode.test_student_cannot_view_start_code) ... ok
+test_student_checkin_with_correct_code_moves_to_inprogress (tasks.tests_new_features.TestStartCode.test_student_checkin_with_correct_code_moves_to_inprogress) ... ok
+test_student_checkin_with_wrong_code_rejected (tasks.tests_new_features.TestStartCode.test_student_checkin_with_wrong_code_rejected) ... ok
+test_student_marks_complete_moves_to_awaiting_confirmation (tasks.tests_new_features.TestStartCode.test_student_marks_complete_moves_to_awaiting_confirmation) ... ok
+test_wrong_student_cannot_checkin (tasks.tests_new_features.TestStartCode.test_wrong_student_cannot_checkin) ... ok
+test_invalid_transition_raises (tasks.tests_new_features.TestStateMachine.test_invalid_transition_raises) ... ok
+test_state_machine_blocks_direct_assigned_to_completed (tasks.tests_new_features.TestStateMachine.test_state_machine_blocks_direct_assigned_to_completed)
+Cannot skip AwaitingConfirmation \u2192 Completed directly from Assigned. ... ok
+test_valid_transition_saves_and_logs (tasks.tests_new_features.TestStateMachine.test_valid_transition_saves_and_logs) ... ok
+test_assigned_task_requires_cancel_not_delete (tasks.tests_new_features.TestTaskRemoval.test_assigned_task_requires_cancel_not_delete)
+Assigned tasks (no escrow yet) should redirect to cancel path. ... ok
+test_cannot_delete_awaiting_confirmation_task (tasks.tests_new_features.TestTaskRemoval.test_cannot_delete_awaiting_confirmation_task) ... ok
+test_cannot_delete_completed_task (tasks.tests_new_features.TestTaskRemoval.test_cannot_delete_completed_task) ... ok
+test_cannot_delete_disputed_task (tasks.tests_new_features.TestTaskRemoval.test_cannot_delete_disputed_task) ... ok
+test_cannot_delete_funded_task (tasks.tests_new_features.TestTaskRemoval.test_cannot_delete_funded_task)
+Deleting a task with Held escrow must be blocked (via CANCEL_REQUIRED_STATUSES). ... ok
+test_cannot_delete_inprogress_task (tasks.tests_new_features.TestTaskRemoval.test_cannot_delete_inprogress_task) ... ok
+test_delete_withdraws_pending_requests_and_notifies (tasks.tests_new_features.TestTaskRemoval.test_delete_withdraws_pending_requests_and_notifies) ... ok
+test_household_can_soft_delete_posted_task (tasks.tests_new_features.TestTaskRemoval.test_household_can_soft_delete_posted_task) ... ok
+test_other_user_cannot_delete_task (tasks.tests_new_features.TestTaskRemoval.test_other_user_cannot_delete_task) ... ok
+test_soft_deleted_task_not_in_list (tasks.tests_new_features.TestTaskRemoval.test_soft_deleted_task_not_in_list) ... ok
+test_household_cannot_checkin (tasks.tests_new_features.TestWrongUserAccess.test_household_cannot_checkin) ... ok
+test_household_cannot_respond_to_dispute (tasks.tests_new_features.TestWrongUserAccess.test_household_cannot_respond_to_dispute) ... ok
+test_student_cannot_cancel_household_task (tasks.tests_new_features.TestWrongUserAccess.test_student_cannot_cancel_household_task) ... ok
+test_student_cannot_confirm_completion (tasks.tests_new_features.TestWrongUserAccess.test_student_cannot_confirm_completion) ... ok
+test_unauthenticated_user_cannot_access_task (tasks.tests_new_features.TestWrongUserAccess.test_unauthenticated_user_cannot_access_task) ... ok
+test_approximate_coords_are_deterministic (tasks.tests_geo.TestApproximateCoords.test_approximate_coords_are_deterministic) ... ok
+test_approximate_coords_differ_from_true_pin (tasks.tests_geo.TestApproximateCoords.test_approximate_coords_differ_from_true_pin) ... ok
+test_approximate_offset_is_within_bounds (tasks.tests_geo.TestApproximateCoords.test_approximate_offset_is_within_bounds) ... ok
+test_different_seeds_give_different_offsets (tasks.tests_geo.TestApproximateCoords.test_different_seeds_give_different_offsets) ... ok
+test_household_owner_sees_exact_coords (tasks.tests_geo.TestApproximateCoords.test_household_owner_sees_exact_coords) ... ok
+test_non_privileged_viewer_sees_blurred_coords (tasks.tests_geo.TestApproximateCoords.test_non_privileged_viewer_sees_blurred_coords)
+A student who is NOT yet assigned sees approximate coordinates. ... ok
+test_household_cannot_checkin (tasks.tests_geo.TestCheckinAccessControl.test_household_cannot_checkin) ... ok
+test_location_audit_includes_checkin_data (tasks.tests_geo.TestCheckinAccessControl.test_location_audit_includes_checkin_data) ... ok
+test_location_audit_requires_admin (tasks.tests_geo.TestCheckinAccessControl.test_location_audit_requires_admin) ... ok
+test_other_student_cannot_checkin (tasks.tests_geo.TestCheckinAccessControl.test_other_student_cannot_checkin) ... ok
+test_unauthenticated_cannot_checkin (tasks.tests_geo.TestCheckinAccessControl.test_unauthenticated_cannot_checkin) ... ok
+test_checkin_allowed_after_consent (tasks.tests_geo.TestConsentGate.test_checkin_allowed_after_consent) ... ok
+test_checkin_blocked_without_consent (tasks.tests_geo.TestConsentGate.test_checkin_blocked_without_consent) ... ok
+test_consent_endpoint_records_version (tasks.tests_geo.TestConsentGate.test_consent_endpoint_records_version) ... ok
+test_consent_get_returns_notice_text (tasks.tests_geo.TestConsentGate.test_consent_get_returns_notice_text) ... ok
+test_legacy_task_without_pin_always_verified (tasks.tests_geo.TestEvaluateCheckinUnit.test_legacy_task_without_pin_always_verified)
+Tasks created before geolocation (no lat/lng) pass with VERIFIED. ... ok
+test_low_accuracy_flagged (tasks.tests_geo.TestEvaluateCheckinUnit.test_low_accuracy_flagged) ... ok
+test_missing_coordinates_returns_location_denied (tasks.tests_geo.TestEvaluateCheckinUnit.test_missing_coordinates_returns_location_denied) ... ok
+test_mock_location_wins_over_distance (tasks.tests_geo.TestEvaluateCheckinUnit.test_mock_location_wins_over_distance)
+FLAGGED_MOCK is returned even when inside geofence. ... ok
+test_out_of_range_outside_geofence (tasks.tests_geo.TestEvaluateCheckinUnit.test_out_of_range_outside_geofence) ... ok
+test_verified_inside_geofence (tasks.tests_geo.TestEvaluateCheckinUnit.test_verified_inside_geofence) ... ok
+test_distance_nairobi_to_kisumu (tasks.tests_geo.TestHaversine.test_distance_nairobi_to_kisumu) ... ok
+test_distance_to_itself_is_zero (tasks.tests_geo.TestHaversine.test_distance_to_itself_is_zero) ... ok
+test_exactly_100_metres_north (tasks.tests_geo.TestHaversine.test_exactly_100_metres_north) ... ok
+test_haversine_accepts_decimal_inputs (tasks.tests_geo.TestHaversine.test_haversine_accepts_decimal_inputs) ... ok
+test_impossible_jump_flag_set_when_speed_exceeds_policy (tasks.tests_geo.TestImpossibleJump.test_impossible_jump_flag_set_when_speed_exceeds_policy)
+Plant a previous check-in far from the task location with a ... ok
+test_large_time_skew_triggers_late_sync_even_without_flag (tasks.tests_geo.TestLateSync.test_large_time_skew_triggers_late_sync_even_without_flag)
+A device time >max_skew seconds in the past counts as a late sync. ... ok
+test_late_sync_flag_is_stored (tasks.tests_geo.TestLateSync.test_late_sync_flag_is_stored)
+Check-in submitted with late_sync=True should be flagged in the DB. ... ok
+test_location_denied_allowed_when_policy_permits (tasks.tests_geo.TestLocationDenied.test_location_denied_allowed_when_policy_permits)
+Admin can enable flagged check-ins even when permission is denied. ... ok
+test_no_coordinates_produces_location_denied (tasks.tests_geo.TestLocationDenied.test_no_coordinates_produces_location_denied)
+Submitting a check-in without coordinates means permission was denied. ... ok
+test_good_accuracy_passes (tasks.tests_geo.TestLowAccuracy.test_good_accuracy_passes) ... ok
+test_low_accuracy_is_flagged_but_allowed (tasks.tests_geo.TestLowAccuracy.test_low_accuracy_is_flagged_but_allowed) ... ok
+test_missing_accuracy_does_not_block (tasks.tests_geo.TestLowAccuracy.test_missing_accuracy_does_not_block)
+accuracy_m is optional ù absent accuracy should not cause LOW_ACCURACY. ... ok
+test_mock_flag_false_does_not_block (tasks.tests_geo.TestMockLocation.test_mock_flag_false_does_not_block) ... ok
+test_mock_location_flag_stored_in_checkin (tasks.tests_geo.TestMockLocation.test_mock_location_flag_stored_in_checkin) ... ok
+test_mock_location_is_rejected (tasks.tests_geo.TestMockLocation.test_mock_location_is_rejected) ... ok
+test_no_show_flagged_when_no_verified_checkin (tasks.tests_geo.TestNoShowWithCheckin.test_no_show_flagged_when_no_verified_checkin) ... ok
+test_no_show_not_flagged_when_verified_checkin_exists (tasks.tests_geo.TestNoShowWithCheckin.test_no_show_not_flagged_when_verified_checkin_exists)
+A VERIFIED check-in prevents the no-show flag. ... ok
+test_audit_log_records_flagged_checkin (tasks.tests_geo.TestOutOfRange.test_audit_log_records_flagged_checkin) ... ok
+test_checkin_outside_geofence_is_flagged_but_allowed (tasks.tests_geo.TestOutOfRange.test_checkin_outside_geofence_is_flagged_but_allowed) ... ok
+test_idempotent_retention_does_not_double_anonymise (tasks.tests_geo.TestRetentionJob.test_idempotent_retention_does_not_double_anonymise) ... ok
+test_old_coordinates_are_anonymised (tasks.tests_geo.TestRetentionJob.test_old_coordinates_are_anonymised) ... ok
+test_open_dispute_delays_anonymisation (tasks.tests_geo.TestRetentionJob.test_open_dispute_delays_anonymisation) ... ok
+test_recent_coordinates_are_not_anonymised (tasks.tests_geo.TestRetentionJob.test_recent_coordinates_are_not_anonymised) ... ok
+test_resolved_dispute_allows_anonymisation (tasks.tests_geo.TestRetentionJob.test_resolved_dispute_allows_anonymisation) ... ok
+test_retry_blocked_when_already_verified (tasks.tests_geo.TestRetryCheckin.test_retry_blocked_when_already_verified) ... ok
+test_student_can_retry_after_out_of_range (tasks.tests_geo.TestRetryCheckin.test_student_can_retry_after_out_of_range)
+After a flagged check-in (OUT_OF_RANGE), student can retry with ... ok
+test_time_skew_stored_in_checkin (tasks.tests_geo.TestTimeSkew.test_time_skew_stored_in_checkin) ... ok
+test_checkin_at_edge_of_geofence_still_verified (tasks.tests_geo.TestVerifiedCheckin.test_checkin_at_edge_of_geofence_still_verified) ... ok
+test_checkin_inside_geofence_is_verified (tasks.tests_geo.TestVerifiedCheckin.test_checkin_inside_geofence_is_verified) ... ok
+test_checkin_moves_task_to_inprogress (tasks.tests_geo.TestVerifiedCheckin.test_checkin_moves_task_to_inprogress) ... ok
+test_checkin_records_arrival_timestamp (tasks.tests_geo.TestVerifiedCheckin.test_checkin_records_arrival_timestamp) ... ok
+test_multiple_wrong_codes_all_recorded (tasks.tests_geo.TestWrongCode.test_multiple_wrong_codes_all_recorded) ... ok
+test_wrong_code_rejected_even_with_correct_location (tasks.tests_geo.TestWrongCode.test_wrong_code_rejected_even_with_correct_location) ... ok
+test_wrong_code_stored_in_checkin_with_location (tasks.tests_geo.TestWrongCode.test_wrong_code_stored_in_checkin_with_location) ... ok
+test_block_same_student_twice_is_idempotent (users.tests.TestBlockStudent.test_block_same_student_twice_is_idempotent) ... ok
+test_block_student (users.tests.TestBlockStudent.test_block_student) ... ok
+test_student_cannot_block (users.tests.TestBlockStudent.test_student_cannot_block) ... ok
+test_unblock_student (users.tests.TestBlockStudent.test_unblock_student) ... ok
+test_household_can_get_settings (users.tests.TestHouseholdSettings.test_household_can_get_settings) ... ok
+test_student_cannot_get_household_settings (users.tests.TestHouseholdSettings.test_student_cannot_get_household_settings) ... ok
+test_update_min_rating (users.tests.TestHouseholdSettings.test_update_min_rating) ... ok
+test_update_search_radius (users.tests.TestHouseholdSettings.test_update_search_radius) ... ok
+test_authenticated_can_access_me (users.tests.TestLogin.test_authenticated_can_access_me) ... ok
+test_inactive_user_rejected (users.tests.TestLogin.test_inactive_user_rejected) ... ok
+test_login_with_email (users.tests.TestLogin.test_login_with_email) ... ok
+test_login_with_username (users.tests.TestLogin.test_login_with_username) ... ok
+test_nonexistent_user_rejected (users.tests.TestLogin.test_nonexistent_user_rejected) ... ok
+test_unauthenticated_cannot_access_me (users.tests.TestLogin.test_unauthenticated_cannot_access_me) ... ok
+test_wrong_password_rejected (users.tests.TestLogin.test_wrong_password_rejected) ... ok
+test_list_notifications_returns_all (users.tests.TestNotifications.test_list_notifications_returns_all) ... ok
+test_mark_all_read (users.tests.TestNotifications.test_mark_all_read) ... ok
+test_notifications_require_auth (users.tests.TestNotifications.test_notifications_require_auth) ... ok
+test_unread_count_is_correct (users.tests.TestNotifications.test_unread_count_is_correct) ... ok
+test_household_cannot_change_own_role (users.tests.TestProfileUpdate.test_household_cannot_change_own_role) ... ok
+test_update_first_name (users.tests.TestProfileUpdate.test_update_first_name) ... ok
+test_update_phone_number (users.tests.TestProfileUpdate.test_update_phone_number) ... ok
+test_flagged_student_excluded_from_eligible (users.tests.TestReliabilityScore.test_flagged_student_excluded_from_eligible)
+A flagged student must not appear in find_eligible_students. ... ok
+test_initial_reliability_is_1 (users.tests.TestReliabilityScore.test_initial_reliability_is_1) ... ok
+test_one_cancellation_lowers_score (users.tests.TestReliabilityScore.test_one_cancellation_lowers_score) ... ok
+test_score_floor_is_0_3 (users.tests.TestReliabilityScore.test_score_floor_is_0_3) ... ok
+test_three_cancellations_flags_student (users.tests.TestReliabilityScore.test_three_cancellations_flags_student) ... ok
+test_duplicate_username_rejected (users.tests.TestStudentRegistration.test_duplicate_username_rejected) ... ok
+test_register_household_returns_token (users.tests.TestStudentRegistration.test_register_household_returns_token) ... ok
+test_register_student_returns_token (users.tests.TestStudentRegistration.test_register_student_returns_token) ... ok
+test_check_status_succeeds (payments.tests.TestPaymentEndpoints.test_check_status_succeeds) ... ok
+test_check_status_wrong_owner (payments.tests.TestPaymentEndpoints.test_check_status_wrong_owner) ... ok
+test_initiate_escrow_missing_phone (payments.tests.TestPaymentEndpoints.test_initiate_escrow_missing_phone) ... ok
+test_initiate_escrow_succeeds (payments.tests.TestPaymentEndpoints.test_initiate_escrow_succeeds) ... ok
+test_initiate_escrow_wrong_owner (payments.tests.TestPaymentEndpoints.test_initiate_escrow_wrong_owner) ... ok
+test_release_escrow_succeeds (payments.tests.TestPaymentEndpoints.test_release_escrow_succeeds) ... ok
+test_release_escrow_wrong_owner (payments.tests.TestPaymentEndpoints.test_release_escrow_wrong_owner) ... ok
+test_average_rating_calculation (payments.tests.TestRatings.test_average_rating_calculation) ... ok
+test_duplicate_rating_rejected (payments.tests.TestRatings.test_duplicate_rating_rejected)
+The API must return a non-2xx status when the same rater submits ... ok
+test_household_rates_student (payments.tests.TestRatings.test_household_rates_student) ... ok
+test_rating_summary_endpoint (payments.tests.TestRatings.test_rating_summary_endpoint) ... ok
+test_score_out_of_range_rejected (payments.tests.TestRatings.test_score_out_of_range_rejected) ... ok
+test_zero_ratings_returns_zero (payments.tests.TestRatings.test_zero_ratings_returns_zero) ... ok
+test_refund_fails_when_not_held (payments.tests.TestRefundService.test_refund_fails_when_not_held) ... ok
+test_refund_idempotent (payments.tests.TestRefundService.test_refund_idempotent) ... ok
+test_refund_to_household_full (payments.tests.TestRefundService.test_refund_to_household_full) ... ok
+test_refund_to_household_partial (payments.tests.TestRefundService.test_refund_to_household_partial) ... ok
+test_release_fails_when_not_held (payments.tests.TestRefundService.test_release_fails_when_not_held) ... ok
+test_release_idempotent (payments.tests.TestRefundService.test_release_idempotent) ... ok
+test_release_to_student_succeeds (payments.tests.TestRefundService.test_release_to_student_succeeds) ... ok
+test_different_keys_create_separate_entries (payments.tests.TestTransactionLedger.test_different_keys_create_separate_entries) ... ok
+test_idempotent_key_prevents_duplicate (payments.tests.TestTransactionLedger.test_idempotent_key_prevents_duplicate) ... ok
+test_ledger_entries_never_deleted_with_task (payments.tests.TestTransactionLedger.test_ledger_entries_never_deleted_with_task)
+Ledger must survive even after task soft-delete (CASCADE is on Task ... ok
+test_record_creates_ledger_entry (payments.tests.TestTransactionLedger.test_record_creates_ledger_entry) ... ok
+test_approximate_coords_blur_deterministically (tasks.tests.TestHaversine.test_approximate_coords_blur_deterministically) ... ok
+test_known_distance_nairobi_points (tasks.tests.TestHaversine.test_known_distance_nairobi_points) ... ok
+test_known_distance_one_degree_latitude (tasks.tests.TestHaversine.test_known_distance_one_degree_latitude) ... ok
+test_symmetry (tasks.tests.TestHaversine.test_symmetry) ... ok
+test_zero_distance_at_same_point (tasks.tests.TestHaversine.test_zero_distance_at_same_point) ... ok
+
+----------------------------------------------------------------------
+Ran 232 tests in 23.192s
+
+OK
+Destroying test database for alias 'default' ('test_domesticplatform_db')...
+
+  Applying users.0007_notification_request_id... OK
+System check identified no issues (0 silenced).
+[run_scheduled_tasks] Running at 2026-11-24T15:57:44.006933+00:00
+[run_scheduled_tasks] Done.
+[run_scheduled_tasks] Running at 2026-11-24T15:57:44.080133+00:00
+  -> 1 check-in location(s) anonymised (retention 90d)
+[run_scheduled_tasks] Done.
+[run_scheduled_tasks] Running at 2026-11-24T15:57:44.159068+00:00
+[run_scheduled_tasks] Done.
+[run_scheduled_tasks] Running at 2026-11-24T15:57:44.232691+00:00
+  -> 1 check-in location(s) anonymised (retention 30d)
+[run_scheduled_tasks] Done.
+[run_scheduled_tasks] Running at 2026-11-24T15:57:44.495089+00:00
+[run_scheduled_tasks] Done.
+[run_scheduled_tasks] Running at 2026-11-24T15:57:44.563868+00:00
+  -> Task #42: flagged NO_SHOW
+[run_scheduled_tasks] Done.

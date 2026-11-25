@@ -1,0 +1,400 @@
+@startuml ERD_DomesticJobPlatform
+
+hide circle
+skinparam linetype ortho
+skinparam roundcorner 5
+skinparam shadowing false
+
+skinparam class {
+  BackgroundColor<<users>>      #DDEEFF
+  BorderColor<<users>>          #336699
+  HeaderBackgroundColor<<users>> #336699
+  HeaderFontColor<<users>>      #FFFFFF
+
+  BackgroundColor<<tasks>>      #DDFFDD
+  BorderColor<<tasks>>          #336633
+  HeaderBackgroundColor<<tasks>> #336633
+  HeaderFontColor<<tasks>>      #FFFFFF
+
+  BackgroundColor<<payments>>   #FFF3CC
+  BorderColor<<payments>>       #996600
+  HeaderBackgroundColor<<payments>> #996600
+  HeaderFontColor<<payments>>   #FFFFFF
+
+  BackgroundColor<<auth>>       #F5DDFF
+  BorderColor<<auth>>           #663399
+  HeaderBackgroundColor<<auth>> #663399
+  HeaderFontColor<<auth>>       #FFFFFF
+
+  BackgroundColor<<policy>>     #FFE5E5
+  BorderColor<<policy>>         #993333
+  HeaderBackgroundColor<<policy>> #993333
+  HeaderFontColor<<policy>>     #FFFFFF
+}
+
+' ─────────────────────────────────────────
+'  AUTH TOKEN APP
+' ─────────────────────────────────────────
+
+entity "**Token**" <<auth>> {
+  * key         : VARCHAR <<PK>>
+  --
+  * user_id     : BIGINT   <<FK → CustomUser>>
+  * created     : DATETIME
+}
+
+' ─────────────────────────────────────────
+'  USERS APP
+' ─────────────────────────────────────────
+
+entity "**CustomUser**" <<users>> {
+  * id               : BIGINT      <<PK>>
+  --
+  * username         : VARCHAR     (unique)
+  * email            : VARCHAR
+  * first_name       : VARCHAR
+  * last_name        : VARCHAR
+  * role             : VARCHAR     (STUDENT|HOUSEHOLD|ADMIN)
+    phone_number     : VARCHAR     (nullable)
+  * password         : VARCHAR
+  * is_active        : BOOLEAN
+  * is_staff         : BOOLEAN
+    last_login       : DATETIME    (nullable)
+  * created_at       : DATETIME
+}
+
+entity "**StudentProfile**" <<users>> {
+  * id                   : BIGINT      <<PK>>
+  --
+  * user_id              : BIGINT      <<FK → CustomUser>>
+  * university_id        : VARCHAR
+  * university_name      : VARCHAR
+  * verification_status  : VARCHAR     (Pending|Verified|Rejected)
+  * availability_status  : BOOLEAN
+  * categories_offered   : JSON
+    location_lat         : DECIMAL(9,6)(nullable)
+    location_lng         : DECIMAL(9,6)(nullable)
+  * cancellation_count   : INTEGER
+  * reliability_score    : FLOAT
+  * is_flagged           : BOOLEAN
+  * created_at           : DATETIME
+}
+
+entity "**HouseholdProfile**" <<users>> {
+  * id                  : BIGINT      <<PK>>
+  --
+  * user_id             : BIGINT      <<FK → CustomUser>>
+  * address             : TEXT
+    location_lat        : DECIMAL(9,6)(nullable)
+    location_lng        : DECIMAL(9,6)(nullable)
+  * verification_status : VARCHAR
+  * min_rating          : DECIMAL(3,1)
+  * search_radius_km    : DECIMAL(5,1)
+  * created_at          : DATETIME
+}
+
+entity "**AdminProfile**" <<users>> {
+  * id          : BIGINT  <<PK>>
+  --
+  * user_id     : BIGINT  <<FK → CustomUser>>
+  * admin_level : INTEGER
+  * department  : VARCHAR
+  * created_at  : DATETIME
+}
+
+entity "**BlockedStudent**" <<users>> {
+  * id           : BIGINT  <<PK>>
+  --
+  * household_id : BIGINT  <<FK → CustomUser>>
+  * student_id   : BIGINT  <<FK → CustomUser>>
+  * created_at   : DATETIME
+  .. UNIQUE(household_id, student_id) ..
+}
+
+entity "**Notification**" <<users>> {
+  * id                : BIGINT  <<PK>>
+  --
+  * recipient_id      : BIGINT  <<FK → CustomUser>>
+  * notification_type : VARCHAR
+  * title             : VARCHAR
+  * message           : TEXT
+  * is_read           : BOOLEAN
+    task_id           : INTEGER (nullable)
+    request_id        : INTEGER (nullable)
+  * created_at        : DATETIME
+}
+
+entity "**LocationConsent**" <<users>> {
+  * id           : BIGINT  <<PK>>
+  --
+  * student_id   : BIGINT  <<FK → CustomUser>>
+  * version      : VARCHAR
+  * consented_at : DATETIME
+}
+
+' ─────────────────────────────────────────
+'  TASKS APP
+' ─────────────────────────────────────────
+
+entity "**PriceGuide**" <<tasks>> {
+  * id                : BIGINT       <<PK>>
+  --
+  * category          : VARCHAR      (unique)
+  * min_price         : DECIMAL(10,2)
+  * max_price         : DECIMAL(10,2)
+  * recommended_price : DECIMAL(10,2)
+  * description       : TEXT
+  * created_at        : DATETIME
+}
+
+entity "**Task**" <<tasks>> {
+  * id                      : BIGINT       <<PK>>
+  --
+  * household_owner_id      : BIGINT       <<FK → CustomUser>>
+    assigned_student_id     : BIGINT       <<FK → CustomUser>> (nullable)
+  * title                   : VARCHAR(200)
+  * description             : TEXT
+  * category                : VARCHAR(100)
+    recommended_price       : DECIMAL(10,2)(nullable)
+  * posted_price            : DECIMAL(10,2)
+  * location_address        : VARCHAR(255)
+    location_lat            : DECIMAL(9,6) (nullable)
+    location_lng            : DECIMAL(9,6) (nullable)
+  * location_landmark       : VARCHAR(200)
+  * geofence_radius_m       : UINT         (default 150)
+  * location_pin_confirmed  : BOOLEAN
+  * status                  : VARCHAR(25)
+  .. Posted|Broadcasting|Matched|PaymentPending ..
+  .. Assigned|InProgress|AwaitingConfirmation ..
+  .. Completed|Cancelled|Disputed|Reopened|NoShow ..
+    scheduled_date          : DATE         (nullable)
+    scheduled_time          : TIME         (nullable)
+  * broadcast_round         : INTEGER
+  * search_radius_km        : DECIMAL(5,1)
+    grace_window_deadline   : DATETIME     (nullable)
+    confirmation_deadline   : DATETIME     (nullable)
+  * is_deleted              : BOOLEAN
+    deleted_at              : DATETIME     (nullable)
+  * created_at              : DATETIME
+  * updated_at              : DATETIME
+}
+
+entity "**TaskCompletion**" <<tasks>> {
+  * id                  : BIGINT       <<PK>>
+  --
+  * task_id             : BIGINT       <<FK → Task>>
+  * start_code          : CHAR(4)
+  * start_code_verified : BOOLEAN
+    arrived_at          : DATETIME     (nullable)
+    started_at          : DATETIME     (nullable)
+    finished_at         : DATETIME     (nullable)
+    checkin_lat         : DECIMAL(9,6) (nullable)
+    checkin_lng         : DECIMAL(9,6) (nullable)
+    before_photo        : VARCHAR      (nullable)
+    after_photo         : VARCHAR      (nullable)
+  * created_at          : DATETIME
+  * updated_at          : DATETIME
+}
+
+entity "**TaskRequest**" <<tasks>> {
+  * id             : BIGINT       <<PK>>
+  --
+  * task_id        : BIGINT       <<FK → Task>>
+  * student_id     : BIGINT       <<FK → CustomUser>>
+  * status         : VARCHAR(20)  (SENT|VIEWED|ACCEPTED|DECLINED|TAKEN|EXPIRED|IGNORED)
+  * sent_at        : DATETIME
+    responded_at   : DATETIME     (nullable)
+  * broadcast_round: INTEGER
+    rank_score     : DECIMAL(6,2) (nullable)
+  .. UNIQUE(task_id, student_id) ..
+}
+
+entity "**Message**" <<tasks>> {
+  * id          : BIGINT  <<PK>>
+  --
+  * task_id     : BIGINT  <<FK → Task>>
+  * sender_id   : BIGINT  <<FK → CustomUser>>
+  * receiver_id : BIGINT  <<FK → CustomUser>>
+  * content     : TEXT
+  * timestamp   : DATETIME
+  * is_read     : BOOLEAN
+}
+
+entity "**CheckIn**" <<tasks>> {
+  * id                   : BIGINT       <<PK>>
+  --
+  * task_id              : BIGINT       <<FK → Task>>
+  * student_id           : BIGINT       <<FK → CustomUser>>
+  * type                 : VARCHAR(10)  (ARRIVAL|START|FINISH)
+    lat                  : DECIMAL(9,6) (nullable)
+    lng                  : DECIMAL(9,6) (nullable)
+    accuracy_m           : FLOAT        (nullable)
+    distance_m           : FLOAT        (nullable)
+    device_time          : DATETIME     (nullable)
+  * server_time          : DATETIME
+    time_skew_seconds    : INTEGER      (nullable)
+  * result               : VARCHAR(20)  (VERIFIED|OUT_OF_RANGE|LOW_ACCURACY|LOCATION_DENIED|WRONG_CODE|FLAGGED_MOCK)
+  * mock_location_flag   : BOOLEAN
+  * late_sync_flag       : BOOLEAN
+  * impossible_jump_flag : BOOLEAN
+  * device_info          : JSON
+    anonymised_at        : DATETIME     (nullable)
+}
+
+entity "**Dispute**" <<tasks>> {
+  * id                     : BIGINT       <<PK>>
+  --
+  * task_id                : BIGINT       <<FK → Task>>
+  * raised_by_id           : BIGINT       <<FK → CustomUser>>
+  * reason                 : VARCHAR(30)
+  * description            : TEXT
+  * student_response       : TEXT
+    student_responded_at   : DATETIME     (nullable)
+    resolved_by_id         : BIGINT       <<FK → CustomUser>> (nullable)
+    outcome                : VARCHAR(20)  (nullable)
+    partial_refund_amount  : DECIMAL(10,2)(nullable)
+  * admin_notes            : TEXT
+    resolved_at            : DATETIME     (nullable)
+  * created_at             : DATETIME
+}
+
+entity "**AuditLog**" <<tasks>> {
+  * id          : BIGINT      <<PK>>
+  --
+  * task_id     : BIGINT      <<FK → Task>>
+    actor_id    : BIGINT      <<FK → CustomUser>> (nullable)
+  * action      : VARCHAR(20) (transition|admin_decision|payment_event|dispute_event)
+  * from_status : VARCHAR(25)
+  * to_status   : VARCHAR(25)
+  * notes       : TEXT
+  * created_at  : DATETIME
+}
+
+' ─────────────────────────────────────────
+'  POLICY SINGLETONS (tasks app)
+' ─────────────────────────────────────────
+
+entity "**CancellationPolicy**" <<policy>> {
+  * id                  : BIGINT  <<PK>> (singleton id=1)
+  --
+  * free_before_hours   : INTEGER (default 24)
+  * partial_refund_pct  : INTEGER (default 80)
+  * created_at          : DATETIME
+  * updated_at          : DATETIME
+}
+
+entity "**LocationPolicy**" <<policy>> {
+  * id                        : BIGINT  <<PK>> (singleton id=1)
+  --
+  * allow_flagged_when_denied  : BOOLEAN
+  * retention_days             : UINT    (default 90)
+  * low_accuracy_threshold_m   : UINT    (default 100)
+  * max_time_skew_seconds      : UINT    (default 300)
+  * max_speed_mps              : UINT    (default 55)
+  * created_at                 : DATETIME
+  * updated_at                 : DATETIME
+}
+
+' ─────────────────────────────────────────
+'  PAYMENTS APP
+' ─────────────────────────────────────────
+
+entity "**Transaction**" <<payments>> {
+  * id                  : BIGINT       <<PK>>
+  --
+  * task_id             : BIGINT       <<FK → Task>>
+  * amount              : DECIMAL(10,2)
+  * status              : VARCHAR(20)  (PendingDeposit|Held|Released|Refunded|PartialRefund)
+    mpesa_reference     : VARCHAR(100) (nullable)
+    checkout_request_id : VARCHAR(100) (nullable)
+  * phone_number        : VARCHAR(20)
+  * created_at          : DATETIME
+  * updated_at          : DATETIME
+}
+
+entity "**TransactionLedger**" <<payments>> {
+  * id               : BIGINT       <<PK>>
+  --
+  * task_id          : BIGINT       <<FK → Task>>
+  * amount           : DECIMAL(10,2)
+  * transaction_type : VARCHAR(20)  (DEPOSIT|HOLD|RELEASE|REFUND|PARTIAL_REFUND|PENALTY)
+  * status           : VARCHAR(15)  (PENDING|COMPLETED|FAILED|SIMULATED)
+  * mpesa_reference  : VARCHAR(100)
+  * idempotency_key  : UUID         (unique)
+    actor_id         : BIGINT       <<FK → CustomUser>> (nullable)
+  * notes            : TEXT
+  * created_at       : DATETIME
+}
+
+entity "**Rating**" <<payments>> {
+  * id            : BIGINT  <<PK>>
+  --
+  * task_id       : BIGINT  <<FK → Task>>
+  * rater_id      : BIGINT  <<FK → CustomUser>>
+  * rated_user_id : BIGINT  <<FK → CustomUser>>
+  * score         : INTEGER (1-5)
+  * comment       : TEXT
+  * created_at    : DATETIME
+  .. UNIQUE(task_id, rater_id, rated_user_id) ..
+}
+
+' ═════════════════════════════════════════
+'  RELATIONSHIPS
+' ═════════════════════════════════════════
+
+' ── auth ──────────────────────────────────
+CustomUser      ||--||  Token               : "has auth\ntoken"
+
+' ── users: one-to-one profiles ───────────
+CustomUser      ||--o|  StudentProfile      : "has student\nprofile"
+CustomUser      ||--o|  HouseholdProfile    : "has household\nprofile"
+CustomUser      ||--o|  AdminProfile        : "has admin\nprofile"
+CustomUser      ||--o|  LocationConsent     : "consents\nlocation"
+
+' ── users: one-to-many ───────────────────
+CustomUser      ||--o{  Notification        : "receives"
+CustomUser      ||--o{  BlockedStudent      : "blocks\n(household)"
+CustomUser      ||--o{  BlockedStudent      : "blocked as\n(student)"
+
+' ── tasks: Task ownership ────────────────
+CustomUser      ||--o{  Task                : "owns\n(household)"
+CustomUser      ||--o{  Task                : "assigned to\n(student)"
+
+' ── tasks: Task children (one-to-one) ────
+Task            ||--o|  TaskCompletion      : "has\ncompletion"
+Task            ||--o|  Dispute             : "has\ndispute"
+Task            ||--o|  Transaction         : "has\ntransaction"
+
+' ── tasks: Task children (one-to-many) ───
+Task            ||--o{  TaskRequest         : "broadcast\nto"
+Task            ||--o{  Message             : "has\nmessages"
+Task            ||--o{  CheckIn             : "has\ncheckins"
+Task            ||--o{  TransactionLedger   : "has ledger\nentries"
+Task            ||--o{  AuditLog            : "has audit\nlogs"
+Task            ||--o{  Rating              : "has\nratings"
+
+' ── tasks: TaskRequest → student ─────────
+CustomUser      ||--o{  TaskRequest         : "receives\nrequest"
+
+' ── tasks: Message participants ──────────
+CustomUser      ||--o{  Message             : "sends"
+CustomUser      ||--o{  Message             : "receives"
+
+' ── tasks: CheckIn student ───────────────
+CustomUser      ||--o{  CheckIn             : "checks\nin"
+
+' ── tasks: Dispute actors ────────────────
+CustomUser      ||--o{  Dispute             : "raises"
+CustomUser      ||--o{  Dispute             : "resolves"
+
+' ── payments: Rating actors ──────────────
+CustomUser      ||--o{  Rating              : "rates"
+CustomUser      ||--o{  Rating              : "rated by"
+
+' ── payments: TransactionLedger actor ────
+CustomUser      ||--o{  TransactionLedger   : "acts on\nledger"
+
+' ── tasks: AuditLog actor ────────────────
+CustomUser      ||--o{  AuditLog            : "logs\naction"
+
+@enduml

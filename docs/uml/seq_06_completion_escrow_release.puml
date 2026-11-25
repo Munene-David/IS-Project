@@ -1,0 +1,101 @@
+@startuml SEQ_06_Completion_Escrow_Release
+title Sequence 6 — Task Completion & Escrow Release
+
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFFFCC
+skinparam sequenceGroupBorderColor #888
+
+actor       "Student"               as ST
+actor       "Household"             as HH
+participant "Mobile App (Student)"  as AppS
+participant "Mobile App (HH)"       as AppH
+participant "TaskAPI"               as API
+participant "Task Model"            as TM
+participant "TaskCompletion Model"  as TC
+participant "RefundService"         as RS
+participant "Transaction Model"     as TX
+participant "TransactionLedger"     as TL
+participant "MpesaGateway"          as MP
+participant "NotificationService"   as NS
+database    "PostgreSQL"            as DB
+
+== Student Marks Job Complete ==
+
+ST   -> AppS  : Upload after-photo\nTap "Mark as Complete"
+AppS -> API   : POST /tasks/{T}/student-complete/\n{after_photo: <file>}
+
+API  -> TM    : task = get(id=T)\nassert task.status == InProgress
+TM   -> DB    : SELECT tasks_task WHERE id=T
+DB  --> TM    : task row
+
+API  -> TC    : completion.finished_at = now()\ncompletion.after_photo = file
+TC   -> DB    : UPDATE tasks_taskcompletion
+
+API  -> TM    : task.status = AwaitingConfirmation\ntask.confirmation_deadline\n  = now() + 48h
+TM   -> DB    : UPDATE tasks_task\nSET status='AwaitingConfirmation',\nconfirmation_deadline=…
+
+API  -> NS    : send(\n  recipient=HH,\n  type=AWAITING_CONFIRMATION,\n  title="Student says job is done",\n  message="Confirm within 48 hours"\n)
+NS   -> DB    : INSERT notification
+
+API --> AppS  : 200 OK {task_status: AwaitingConfirmation}
+AppS --> ST   : "Job marked complete.\nWaiting for household confirmation."
+
+== Household Confirms Completion ==
+
+HH   -> AppH  : Review after-photo\nTap "Confirm Completion"
+AppH -> API   : POST /tasks/{T}/confirm-completion/
+
+API  -> TM    : assert task.status == AwaitingConfirmation\nassert now() <= confirmation_deadline
+TM   -> DB    : SELECT tasks_task WHERE id=T
+DB  --> TM    : task row
+
+API  -> TM    : task.status = Completed
+TM   -> DB    : UPDATE tasks_task SET status='Completed'
+
+== Escrow Release ==
+
+API  -> RS    : release_to_student(task=T)
+
+RS   -> TX    : transaction = Transaction.objects.get(task=T)
+TX   -> DB    : SELECT payments_transaction WHERE task=T
+DB  --> TX    : transaction (status=Held, amount=X)
+
+RS   -> MP    : disburse_to_student(\n  student_phone=task.assigned_student.phone,\n  amount=transaction.amount\n)
+MP  --> RS    : {mpesa_reference: "MP_REF_XYZ", success: true}
+
+RS   -> TX    : transaction.status = Released\ntransaction.mpesa_reference = "MP_REF_XYZ"
+TX   -> DB    : UPDATE payments_transaction SET status='Released'
+
+RS   -> TL    : TransactionLedger.record(\n  task=T,\n  amount=transaction.amount,\n  type=RELEASE,\n  status=COMPLETED,\n  mpesa_reference="MP_REF_XYZ",\n  idempotency_key=uuid4()\n)
+TL   -> DB    : INSERT INTO payments_transactionledger
+DB  --> TL    : ledger row saved
+
+RS  --> API   : {released: true, amount: X}
+
+== Post-Completion Notifications ==
+
+API  -> NS    : send(\n  recipient=ST,\n  type=PAYMENT_RELEASED,\n  title="Payment sent!",\n  message="KES {amount} sent to your M-Pesa"\n)
+NS   -> DB    : INSERT notification
+
+API  -> NS    : send(\n  recipient=HH,\n  type=TASK_COMPLETED,\n  title="Task completed",\n  message="Funds released to student"\n)
+NS   -> DB    : INSERT notification
+
+API --> AppH  : 200 OK {task_status: Completed}
+AppH --> HH   : "Task complete! Please rate the student."
+
+note over ST, HH
+  Both parties are subsequently prompted
+  to leave a Rating (1–5 ★ + comment).
+  Ratings stored in payments_rating.
+end note
+
+== Auto-Confirm Fallback (48h deadline) ==
+
+note over API, DB
+  A scheduled job checks AwaitingConfirmation tasks
+  where now() > confirmation_deadline.
+  It auto-confirms and triggers the same release flow
+  if the household has not responded within 48 hours.
+end note
+
+@enduml

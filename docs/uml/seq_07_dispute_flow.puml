@@ -1,0 +1,118 @@
+@startuml SEQ_07_Dispute_Flow
+title Sequence 7 — Dispute Flow
+
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFFFCC
+skinparam sequenceGroupBorderColor #888
+
+actor       "Household"             as HH
+actor       "Student"               as ST
+actor       "Admin"                 as AD
+participant "Mobile App (HH)"       as AppH
+participant "Mobile App (Student)"  as AppS
+participant "Admin Dashboard"       as AppA
+participant "TaskAPI"               as API
+participant "Task Model"            as TM
+participant "Dispute Model"         as DM
+participant "RefundService"         as RS
+participant "Transaction Model"     as TX
+participant "TransactionLedger"     as TL
+participant "NotificationService"   as NS
+database    "PostgreSQL"            as DB
+
+== Household Raises Dispute ==
+
+HH   -> AppH  : Tap "Raise Dispute"\nSelect reason + enter description
+AppH -> API   : POST /tasks/{T}/dispute/\n{reason: "Job not done",\ndescription: "Student left early"}
+
+API  -> TM    : task = get(id=T)\nassert task.status in\n  [AwaitingConfirmation, Completed]
+TM   -> DB    : SELECT tasks_task WHERE id=T
+DB  --> TM    : task row
+
+API  -> TM    : task.status = Disputed
+TM   -> DB    : UPDATE tasks_task SET status='Disputed'
+
+API  -> DM    : Dispute.objects.create(\n  task=T,\n  raised_by=HH,\n  reason="Job not done",\n  description="…"\n)
+DM   -> DB    : INSERT INTO tasks_dispute
+DB  --> DM    : dispute saved (id=D)
+
+API  -> NS    : send(\n  recipient=ST,\n  type=DISPUTE_RAISED,\n  title="A dispute has been raised",\n  message="Please respond within 24h"\n)
+NS   -> DB    : INSERT notification
+
+API  -> NS    : send(\n  recipient=AdminGroup,\n  type=NEW_DISPUTE,\n  title="Dispute needs review",\n  task_id=T\n)
+NS   -> DB    : INSERT notification
+
+API --> AppH  : 200 OK {dispute_id: D, status: Disputed}
+AppH --> HH   : "Dispute submitted. Admin will review."
+
+== Student Responds (within 24 hours) ==
+
+AppS -> ST    : Push notification — "Respond to dispute"
+ST   -> AppS  : Enter response text
+AppS -> API   : POST /tasks/{T}/dispute/respond/\n{student_response: "I completed all tasks"}
+
+API  -> DM    : dispute.student_response = "I completed all tasks"\ndispute.student_responded_at = now()
+DM   -> DB    : UPDATE tasks_dispute
+
+API  -> NS    : send(\n  recipient=AD_GROUP,\n  type=DISPUTE_RESPONSE,\n  title="Student has responded to dispute"\n)
+NS   -> DB    : INSERT notification
+
+API --> AppS  : 200 OK
+AppS --> ST   : "Response submitted."
+
+== Admin Reviews Evidence ==
+
+AD   -> AppA  : Open dispute D
+AppA -> API   : GET /admin/disputes/{D}/audit/
+API  -> DB    : SELECT CheckIn WHERE task=T\n(map, timestamps, coordinates)
+DB  --> API   : checkin records
+API  -> DB    : SELECT Message WHERE task=T\n(chat history)
+DB  --> API   : messages
+API  -> DB    : SELECT AuditLog WHERE task=T
+DB  --> API   : audit trail
+API --> AppA  : {checkins, messages, audit_logs,\ndispute, student_response}
+AppA --> AD   : Location map + chat history + timeline
+
+== Admin Resolves Dispute ==
+
+AD   -> AppA  : Select outcome:\n  full_refund | partial_refund | release\nEnter admin_notes\n(+ partial_amount if applicable)
+AppA -> API   : POST /admin/disputes/{D}/resolve/\n{outcome: "partial_refund",\npartial_refund_amount: 400,\nadmin_notes: "Student arrived but left early"}
+
+API  -> DM    : dispute.outcome = "partial_refund"\ndispute.partial_refund_amount = 400\ndispute.admin_notes = "…"\ndispute.resolved_by = AD\ndispute.resolved_at = now()
+DM   -> DB    : UPDATE tasks_dispute
+
+alt outcome == full_refund
+  API -> RS   : refund(task=T, amount=full_amount,\ntype=REFUND)
+  RS  -> TX   : transaction.status = Refunded
+  TX  -> DB   : UPDATE payments_transaction
+  RS  -> TL   : TransactionLedger.record(\n  type=REFUND, status=COMPLETED\n)
+  TL  -> DB   : INSERT ledger row
+
+else outcome == partial_refund
+  API -> RS   : partial_refund(\n  task=T,\n  refund_amount=400,\n  release_amount=full-400\n)
+  RS  -> TX   : transaction.status = PartialRefund
+  TX  -> DB   : UPDATE payments_transaction
+  RS  -> TL   : TransactionLedger.record(type=REFUND, amount=400)
+  TL  -> DB   : INSERT ledger row (refund portion)
+  RS  -> TL   : TransactionLedger.record(type=RELEASE, amount=full-400)
+  TL  -> DB   : INSERT ledger row (release portion)
+
+else outcome == release
+  API -> RS   : release_to_student(task=T)
+  RS  -> TX   : transaction.status = Released
+  TX  -> DB   : UPDATE payments_transaction
+  RS  -> TL   : TransactionLedger.record(type=RELEASE)
+  TL  -> DB   : INSERT ledger row
+end
+
+API  -> TM    : task.status = Completed
+TM   -> DB    : UPDATE tasks_task SET status='Completed'
+
+API  -> NS    : send(recipient=HH, type=DISPUTE_RESOLVED,\ntitle="Dispute resolved", message=outcome)
+API  -> NS    : send(recipient=ST, type=DISPUTE_RESOLVED,\ntitle="Dispute resolved", message=outcome)
+NS   -> DB    : INSERT notifications (x2)
+
+API --> AppA  : 200 OK {dispute_resolved: true, outcome}
+AppA --> AD   : "Dispute resolved."
+
+@enduml

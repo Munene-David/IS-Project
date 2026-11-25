@@ -1,0 +1,80 @@
+@startuml SEQ_04_Escrow_Payment
+title Sequence 4 — Escrow Payment (confirm-match)
+
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFFFCC
+skinparam sequenceGroupBorderColor #888
+
+actor       "Household"             as HH
+participant "Mobile App"            as App
+participant "TaskAPI\n/tasks/{id}/\nconfirm-match/" as API
+participant "Task Model"            as TM
+participant "MpesaGateway"          as MP
+participant "Transaction Model"     as TX
+participant "TransactionLedger"     as TL
+participant "TaskCompletion Model"  as TC
+participant "NotificationService"   as NS
+database    "PostgreSQL"            as DB
+
+HH  -> App : View matched task\nTap "Confirm & Pay"
+App -> API : POST /tasks/{T}/confirm-match/\n{phone_number: "2547XXXXXXXX"}
+
+API -> TM  : task = Task.objects.get(id=T)\nassert task.status == Matched
+TM  -> DB  : SELECT tasks_task WHERE id=T
+DB --> TM  : task row
+
+API -> TM  : task.status = PaymentPending
+TM  -> DB  : UPDATE tasks_task SET status='PaymentPending'
+
+== M-Pesa STK Push ==
+
+API -> MP  : initiate_stk_push(\n  phone=HH.phone,\n  amount=task.posted_price,\n  reference=task.id\n)
+
+alt Sandbox / Simulation mode
+  MP --> API : {checkout_request_id, simulated=true}
+  note right of MP
+    In sandbox the payment is
+    immediately simulated as
+    successful — no real STK push.
+  end note
+else Production
+  MP --> API : {checkout_request_id}
+  note right of MP
+    Real STK push sent to HH's
+    phone. Callback received
+    asynchronously (omitted here
+    for brevity).
+  end note
+end
+
+== Record Transaction ==
+
+API -> TX  : Transaction.objects.create(\n  task=T,\n  amount=posted_price,\n  status=Held,\n  checkout_request_id=…,\n  phone_number=…\n)
+TX  -> DB  : INSERT INTO payments_transaction
+DB --> TX  : transaction saved
+
+API -> TL  : TransactionLedger.record(\n  task=T,\n  amount=posted_price,\n  type=HOLD,\n  status=COMPLETED,\n  idempotency_key=uuid4()\n)
+TL  -> DB  : INSERT INTO payments_transactionledger
+DB --> TL  : ledger row saved
+
+== Advance Task & Create Completion Record ==
+
+API -> TM  : task.status = Assigned
+TM  -> DB  : UPDATE tasks_task SET status='Assigned'
+
+API -> TC  : TaskCompletion.objects.create(\n  task=T,\n  start_code=generate_4digit()\n)
+TC  -> DB  : INSERT INTO tasks_taskcompletion\n(start_code='7342', verified=false)
+DB --> TC  : completion saved
+
+== Notifications ==
+
+API -> NS  : send(\n  recipient=HH,\n  type=PAYMENT_CONFIRMED,\n  title="Payment held in escrow",\n  message="Start code: 7342"\n)
+NS  -> DB  : INSERT notification
+
+API -> NS  : send(\n  recipient=AssignedStudent,\n  type=TASK_ASSIGNED,\n  title="You have a new job!",\n  message="Full address: {task.location_address}"\n)
+NS  -> DB  : INSERT notification
+
+API --> App : 200 OK\n{task_id, status=Assigned,\namount_held, start_code_sent=true}
+App --> HH  : "Payment confirmed. Start code sent to you.\nStudent notified of full address."
+
+@enduml

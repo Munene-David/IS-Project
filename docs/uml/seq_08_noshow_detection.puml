@@ -1,0 +1,89 @@
+@startuml SEQ_08_NoShow_Detection
+title Sequence 8 — No-Show Detection (Scheduled Job)
+
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFFFCC
+skinparam sequenceGroupBorderColor #888
+
+participant "Scheduler\n(cron / celery beat)" as CRON
+participant "run_scheduled_tasks()"  as SCHED
+participant "Task Model"             as TM
+participant "CheckIn Model"          as CI
+participant "StudentProfile Model"   as SP
+participant "RefundService"          as RS
+participant "Transaction Model"      as TX
+participant "TransactionLedger"      as TL
+participant "NotificationService"    as NS
+participant "AuditLog Model"         as AL
+database    "PostgreSQL"             as DB
+
+== Scheduler Fires Every 5–10 Minutes ==
+
+CRON  -> SCHED : run_scheduled_tasks()
+
+SCHED -> TM    : Task.objects.filter(\n  status='Assigned',\n  scheduled_time__lte=now()-30min\n)
+TM    -> DB    : SELECT tasks_task\nWHERE status='Assigned'\nAND scheduled_datetime ≤ now()-30min
+DB   --> TM    : [task_1, task_2, …]  (overdue tasks)
+
+loop for each overdue_task in results
+
+  SCHED -> CI  : CheckIn.objects.filter(\n  task=overdue_task,\n  result='VERIFIED',\n  type__in=[ARRIVAL, START]\n).exists()
+  CI    -> DB  : SELECT tasks_checkin\nWHERE task=overdue_task AND result='VERIFIED'
+  DB   --> CI  : count
+
+  alt Verified check-in EXISTS → student showed up normally
+    note over SCHED : Skip — task is in progress normally
+  else No verified check-in found → NO-SHOW
+
+    SCHED -> TM  : overdue_task.status = NoShow
+    TM    -> DB  : UPDATE tasks_task\nSET status='NoShow'
+
+    SCHED -> AL  : AuditLog.objects.create(\n  task=overdue_task,\n  actor=system,\n  action=transition,\n  from_status=Assigned,\n  to_status=NoShow\n)
+    AL    -> DB  : INSERT INTO tasks_auditlog
+
+    == Reliability Penalty ==
+
+    SCHED -> SP  : profile = StudentProfile.objects.get(\n  user=overdue_task.assigned_student\n)
+    SP    -> DB  : SELECT users_studentprofile
+    DB   --> SP  : profile row
+
+    SCHED -> SP  : profile.record_cancellation()
+    note right of SP
+      record_cancellation():
+        cancellation_count += 1
+        reliability_score = max(0,
+          reliability_score - 0.1)
+        if cancellation_count >= threshold:
+          is_flagged = True
+    end note
+    SP    -> DB  : UPDATE users_studentprofile\n(cancellation_count, reliability_score,\nis_flagged)
+
+    == Escrow Refund to Household ==
+
+    SCHED -> RS  : refund(task=overdue_task, type=REFUND)
+    RS    -> TX  : transaction = Transaction.objects.get(\n  task=overdue_task\n)
+    TX    -> DB  : SELECT payments_transaction
+    DB   --> TX  : transaction (status=Held)
+
+    RS    -> TX  : transaction.status = Refunded
+    TX    -> DB  : UPDATE payments_transaction SET status='Refunded'
+
+    RS    -> TL  : TransactionLedger.record(\n  task=overdue_task,\n  type=REFUND,\n  status=COMPLETED,\n  notes="No-show auto-refund",\n  idempotency_key=uuid4()\n)
+    TL    -> DB  : INSERT INTO payments_transactionledger
+
+    == Notify Household ==
+
+    SCHED -> NS  : send(\n  recipient=overdue_task.household_owner,\n  type=NO_SHOW,\n  title="Student did not show up",\n  message="Full refund initiated.\n           Task can be re-posted."\n)
+    NS    -> DB  : INSERT notification
+
+    == Optionally Notify Student ==
+
+    SCHED -> NS  : send(\n  recipient=overdue_task.assigned_student,\n  type=NO_SHOW_PENALTY,\n  title="No-show recorded",\n  message="Your reliability score has been penalised."\n)
+    NS    -> DB  : INSERT notification
+
+  end
+end
+
+SCHED --> CRON : done (N tasks processed)
+
+@enduml

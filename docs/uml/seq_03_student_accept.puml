@@ -1,0 +1,94 @@
+@startuml SEQ_03_Student_Accept
+title Sequence 3 — Student Accept (Atomic First-to-Accept)
+
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFFFCC
+skinparam sequenceGroupBorderColor #888
+
+actor       "Student A"             as SA
+actor       "Student B"             as SB
+participant "Mobile App"            as App
+participant "TaskAPI\n/tasks/"      as API
+participant "DB Transaction"        as TX
+participant "Task Model"            as TM
+participant "TaskRequest Model"     as TR
+participant "NotificationService"   as NS
+database    "PostgreSQL"            as DB
+
+== Student Views Inbox ==
+
+SA  -> App : Open job requests inbox
+App -> API : GET /tasks/my-requests/
+API -> DB  : SELECT TaskRequest\nWHERE student=SA AND status=SENT
+DB --> API : [request list]
+API --> App : 200 OK {requests}
+App --> SA  : Show request cards
+
+SA  -> App : Tap "Accept" on request (request_id=R)
+
+== Atomic Accept Transaction ==
+
+App -> API : POST /tasks/accept-request/\n{request_id: R}
+
+API -> TX  : BEGIN TRANSACTION (atomic)
+
+TX  -> DB  : SELECT tasks_task\nWHERE id=T\nFOR UPDATE          /' row-level lock '/
+DB --> TX  : task row (locked)
+
+TX  -> DB  : SELECT tasks_taskrequest\nWHERE id=R\nFOR UPDATE
+DB --> TX  : request row (locked)
+
+alt Task status ≠ Broadcasting
+  TX  -> TX  : ROLLBACK
+  API --> App : 409 Conflict\n{"detail": "Task no longer available"}
+  App --> SA  : "Sorry, this task was taken"
+
+else Task.status == Broadcasting
+
+  alt TaskRequest.status ≠ SENT (already TAKEN/EXPIRED)
+    TX  -> TX  : ROLLBACK
+    API --> App : 409 Conflict\n{"detail": "Request already processed"}
+    App --> SA  : "Request no longer active"
+
+  else Request is SENT and task is Broadcasting
+
+    TX  -> TR  : request.status = ACCEPTED\nrequest.responded_at = now()
+    TR  -> DB  : UPDATE tasks_taskrequest SET status='ACCEPTED'
+
+    TX  -> DB  : UPDATE tasks_taskrequest\nSET status='TAKEN'\nWHERE task=T\nAND student ≠ SA\nAND status IN (SENT, VIEWED)
+    note right : All other pending requests\nmarked TAKEN atomically
+
+    TX  -> TM  : task.status = Matched\ntask.assigned_student = SA\ntask.grace_window_deadline\n  = now() + 10 min
+    TM  -> DB  : UPDATE tasks_task\nSET status='Matched',\nassigned_student=SA,\ngrace_window_deadline=…
+
+    TX  -> TX  : COMMIT
+
+    API -> NS  : send(\n  recipient=SA,\n  type=TASK_MATCHED,\n  title="You got the job!",\n  task_id=T\n)
+    NS  -> DB  : INSERT notification (SA)
+
+    API -> NS  : send(\n  recipient=HH,\n  type=TASK_MATCHED,\n  title="Student matched – confirm within 10 min",\n  task_id=T\n)
+    NS  -> DB  : INSERT notification (HH)
+
+    API --> App : 200 OK\n{task_id, matched_student,\ngrace_window_deadline}
+    App --> SA  : "You matched! Waiting for household to confirm."
+  end
+end
+
+== Concurrent Accept Attempt (Student B loses the race) ==
+
+note over SB, DB
+  Student B taps Accept on the same task at nearly the same time.
+  The SELECT … FOR UPDATE blocks until Student A's transaction commits.
+  By the time B's lock is granted, task.status = Matched → 409 returned.
+end note
+
+SB  -> App : POST /tasks/accept-request/ {request_id: R2}
+App -> API : (arrives while A's TX is in-flight or just committed)
+API -> TX  : BEGIN TRANSACTION
+TX  -> DB  : SELECT tasks_task WHERE id=T FOR UPDATE
+DB --> TX  : task (status=Matched)
+TX  -> TX  : ROLLBACK — status ≠ Broadcasting
+API --> App : 409 Conflict
+App --> SB  : "Task no longer available"
+
+@enduml

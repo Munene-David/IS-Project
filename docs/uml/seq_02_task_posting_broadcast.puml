@@ -1,0 +1,95 @@
+@startuml SEQ_02_Task_Posting_Broadcast
+title Sequence 2 — Task Posting & Broadcast
+
+skinparam sequenceArrowThickness 1.5
+skinparam noteBackgroundColor #FFFFCC
+skinparam sequenceGroupBorderColor #888
+
+actor       "Household"             as HH
+participant "Mobile App"            as App
+participant "TaskAPI\n/tasks/"      as API
+participant "TaskCreateSerializer"  as SER
+participant "Task Model"            as TM
+participant "BroadcastService"      as BS
+participant "EligibilityEngine"     as EE
+participant "TaskRequest Model"     as TR
+participant "NotificationService"   as NS
+database    "PostgreSQL"            as DB
+control     "BackgroundThread"      as BT
+
+== Post Task ==
+
+HH  -> App : Fill task form\n(title, category, price,\ndate/time, pin location)
+App -> API : POST /tasks/\n{title, category, posted_price,\nlocation_lat, lng, pin_confirmed, …}
+
+API -> SER : TaskCreateSerializer.validate()
+SER -> SER : Validate location_pin_confirmed == true
+SER -> SER : Validate scheduled_date, price range
+
+alt Validation fails
+  SER --> API : ValidationError
+  API --> App : 400 Bad Request {errors}
+  App --> HH  : Show errors
+else Valid
+  SER -> TM   : Task.objects.create(\n  status=Posted,\n  household_owner=request.user\n)
+  TM  -> DB   : INSERT INTO tasks_task\n(status='Posted')
+  DB --> TM   : task saved (id=T)
+  API --> App : 201 Created {task_id=T}
+  App --> HH  : "Task posted!"
+
+  API -> BT   : spawn thread → broadcast_task(task_id=T)
+end
+
+== Broadcast Round 1 ==
+
+BT  -> BS   : broadcast_task(task_id=T)
+BS  -> TM   : task.status = Broadcasting\ntask.broadcast_round = 1\ntask.search_radius_km = 50
+TM  -> DB   : UPDATE tasks_task SET status='Broadcasting'
+
+BS  -> EE   : find_eligible_students(\n  task=T,\n  radius_km=50,\n  min_rating=0,\n  round=1\n)
+EE  -> DB   : SELECT StudentProfile\nWHERE availability=true\nAND verification=Verified\nAND NOT blocked\nAND within 50 km
+DB --> EE   : candidate list
+
+EE  -> EE   : score_and_rank_students()\n(reliability, distance,\nrating, availability)
+EE --> BS   : ranked_students[0..9]  (top 10)
+
+loop for each student in top-10
+  BS -> TR  : TaskRequest.objects.create(\n  task=T, student=s,\n  status=SENT, round=1,\n  rank_score=s.score\n)
+  TR -> DB  : INSERT INTO tasks_taskrequest
+  BS -> NS  : send(recipient=s, type=NEW_REQUEST,\n  title="New job request", task_id=T)
+  NS -> DB  : INSERT INTO users_notification
+end
+
+BS  -> BS   : set_timer(10 min) → check_round_1_response
+
+note right of BS
+  10-minute timer ticks
+end note
+
+alt Any student ACCEPTs within 10 min
+  BS --> BS : broadcast complete (handled in Seq 3)
+else No acceptance after 10 min
+
+  == Broadcast Round 2 ==
+
+  BS  -> TM  : task.broadcast_round = 2\ntask.search_radius_km = wider
+  TM  -> DB  : UPDATE tasks_task
+  BS  -> EE  : find_eligible_students(\n  radius_km=wider,\n  exclude previously_sent\n)
+  EE --> BS  : new_candidates
+
+  loop for each new candidate
+    BS -> TR : TaskRequest.objects.create(round=2, …)
+    BS -> NS : send(recipient=s, …)
+  end
+
+  BS -> BS   : set_timer(10 min)
+
+  alt No acceptance after Round 2
+    BS  -> TM : task.status = Posted
+    TM  -> DB : UPDATE tasks_task SET status='Posted'
+    BS  -> NS : send(\n  recipient=household,\n  type=BROADCAST_FAILED,\n  title="No students available"\n)
+    BS --> App : (push notification delivered)
+  end
+end
+
+@enduml

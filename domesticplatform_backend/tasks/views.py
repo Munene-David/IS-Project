@@ -71,22 +71,49 @@ class TaskViewSet(viewsets.ModelViewSet):
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_queryset(self):
-        # Exclude soft-deleted tasks from normal listings
-        qs = Task.objects.filter(is_deleted=False).order_by('-created_at')
+        # Exclude soft-deleted tasks and seed/system tasks from all listings
+        qs = Task.objects.filter(
+            is_deleted=False
+        ).exclude(
+            title__startswith='_'
+        ).order_by('-created_at')
+
+        user = self.request.user
         category = self.request.query_params.get('category')
         task_status = self.request.query_params.get('status')
         search = self.request.query_params.get('search')
         my_tasks = self.request.query_params.get('my_tasks')
 
         if my_tasks:
-            user = self.request.user
+            # Explicit "my tasks" request
             if user.is_household():
                 qs = qs.filter(household_owner=user)
             else:
+                # Student: tasks they have a request for OR are assigned to
                 request_task_ids = TaskRequest.objects.filter(
                     student=user
                 ).values_list('task_id', flat=True)
-                qs = qs.filter(Q(assigned_student=user) | Q(id__in=request_task_ids))
+                qs = qs.filter(
+                    Q(assigned_student=user) | Q(id__in=request_task_ids)
+                )
+        else:
+            # Default listing — enforce role-based visibility
+            if user.is_household():
+                # Households only ever see their own tasks
+                qs = qs.filter(household_owner=user)
+            elif user.is_student():
+                # Students only see:
+                #   1. Tasks that were broadcast to them (they have a TaskRequest)
+                #   2. Tasks they are assigned to
+                # They do NOT see tasks belonging to other households/students
+                request_task_ids = TaskRequest.objects.filter(
+                    student=user
+                ).values_list('task_id', flat=True)
+                qs = qs.filter(
+                    Q(assigned_student=user) | Q(id__in=request_task_ids)
+                )
+            # Admins see everything (no extra filter)
+
         if category:
             qs = qs.filter(category__iexact=category)
         if task_status:

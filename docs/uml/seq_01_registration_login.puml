@@ -1,0 +1,84 @@
+@startuml SEQ_01_Registration_Login
+title Sequence 1 — User Registration & Login
+
+skinparam sequenceArrowThickness 1.5
+skinparam sequenceParticipantBorderColor #555
+skinparam sequenceLifeLineBorderColor #999
+skinparam noteBackgroundColor #FFFFCC
+skinparam sequenceGroupBorderColor #888
+
+actor       "Student / Household"   as User
+participant "Mobile App"            as App
+participant "AuthAPI\n/auth/"       as API
+participant "CustomUser\nModel"     as CU
+participant "StudentProfile\nModel" as SP
+participant "HouseholdProfile\nModel" as HP
+participant "RatingService"         as RS
+database    "PostgreSQL"            as DB
+
+== Student Registration ==
+
+User  -> App   : Fill registration form\n(username, email, password,\nrole=STUDENT, university_id, …)
+App   -> API   : POST /auth/register/\n{role, username, email, password, …}
+API   -> API   : Validate payload\n(RegisterSerializer)
+
+alt Validation fails
+  API --> App  : 400 Bad Request\n{errors}
+  App --> User : Show field errors
+else Validation passes
+  API   -> CU  : CustomUser.objects.create_user()\n(role=STUDENT)
+  CU    -> DB  : INSERT INTO users_customuser
+  DB   --> CU  : user saved (id=X)
+
+  API   -> SP  : StudentProfile.objects.create(\n  user=user,\n  university_id=…,\n  verification_status=Pending\n)
+  SP    -> DB  : INSERT INTO users_studentprofile
+  DB   --> SP  : profile saved
+
+  API   -> RS  : seed_initial_rating(user, score=5.0)
+  RS    -> DB  : INSERT INTO payments_rating\n(score=5, system seed)
+  DB   --> RS  : seed rating saved
+
+  API  --> App : 201 Created\n{token, user_id, role}
+  App  --> User : "Account created! Pending verification."
+end
+
+== Household Registration ==
+
+User  -> App   : Fill form (role=HOUSEHOLD, address, …)
+App   -> API   : POST /auth/register/\n{role=HOUSEHOLD, …}
+API   -> CU    : CustomUser.objects.create_user()\n(role=HOUSEHOLD)
+CU    -> DB    : INSERT INTO users_customuser
+DB   --> CU    : saved
+
+API   -> HP    : HouseholdProfile.objects.create(\n  user=user, address=…\n)
+HP    -> DB    : INSERT INTO users_householdprofile
+DB   --> HP    : saved
+
+API  --> App   : 201 Created {token, user_id, role}
+App  --> User  : "Account created!"
+
+== Login (username or email) ==
+
+User  -> App   : Enter credentials\n(username or email, password)
+App   -> API   : POST /auth/login/\n{username_or_email, password}
+API   -> API   : Normalize: detect email vs username
+API   -> CU    : CustomUser.objects.get(\n  Q(username=…) | Q(email=…)\n)
+CU    -> DB    : SELECT FROM users_customuser
+DB   --> CU    : user record
+
+alt User not found
+  API --> App  : 401 Unauthorized\n{"detail": "Invalid credentials"}
+  App --> User : "Invalid username/email or password"
+else User found
+  API   -> API : authenticate(password)
+  alt Password wrong
+    API --> App : 401 Unauthorized
+    App --> User : "Invalid credentials"
+  else Password correct
+    API   -> API : Token.objects.get_or_create(user)
+    API  --> App : 200 OK\n{token, user_id, role}
+    App  --> User : Navigate to home screen
+  end
+end
+
+@enduml

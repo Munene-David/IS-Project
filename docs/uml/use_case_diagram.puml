@@ -1,0 +1,241 @@
+@startuml Use_Case_Diagram_DomesticJobPlatform
+title Domestic Job & Escrow Platform — Use Case Diagram
+
+skinparam actorStyle awesome
+skinparam usecaseBackgroundColor #FAFAFA
+skinparam usecaseBorderColor #555555
+skinparam usecaseArrowColor #333333
+skinparam actorBorderColor #333333
+skinparam actorBackgroundColor #DDEEFF
+skinparam packageBackgroundColor #F8F8F8
+skinparam packageBorderColor #AAAAAA
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam linetype ortho
+
+' ═══════════════════════════════════════════════
+'  ACTORS
+' ═══════════════════════════════════════════════
+
+actor "Household\nOwner"   as HH   #DDEEFF
+actor "Student"            as ST   #DDFFDD
+actor "Admin"              as AD   #FFE5E5
+actor "M-Pesa\n(Safaricom)" as MP  #FFF3CC
+actor "Scheduler\n(Cron)"  as SC   #F5DDFF
+
+' ═══════════════════════════════════════════════
+'  AUTHENTICATION & PROFILE
+' ═══════════════════════════════════════════════
+
+package "Authentication & Profile" #EAF4FB {
+  usecase "Register as\nHousehold Owner"    as UC_REG_HH
+  usecase "Register as\nStudent"            as UC_REG_ST
+  usecase "Login\n(username or email)"      as UC_LOGIN
+  usecase "View / Edit Profile"             as UC_PROFILE
+  usecase "View My Ratings"                 as UC_MY_RATINGS
+  usecase "View Payment History"            as UC_PAY_HIST
+  usecase "Accept Location\nConsent Notice" as UC_CONSENT
+}
+
+HH --> UC_REG_HH
+HH --> UC_LOGIN
+HH --> UC_PROFILE
+HH --> UC_MY_RATINGS
+HH --> UC_PAY_HIST
+
+ST --> UC_REG_ST
+ST --> UC_LOGIN
+ST --> UC_PROFILE
+ST --> UC_MY_RATINGS
+ST --> UC_PAY_HIST
+ST --> UC_CONSENT
+
+UC_REG_ST ..> UC_CONSENT : <<include>>
+
+' ═══════════════════════════════════════════════
+'  TASK MANAGEMENT (HOUSEHOLD)
+' ═══════════════════════════════════════════════
+
+package "Task Management — Household" #DDFFDD {
+  usecase "Post New Task\n(with map pin)"       as UC_POST
+  usecase "Set Task Location\n(map picker)"     as UC_MAP
+  usecase "Search Address\n(OpenStreetMap)"     as UC_ADDR
+  usecase "Use Current\nLocation"               as UC_GPS_HH
+  usecase "View My Tasks"                       as UC_MY_TASKS
+  usecase "Re-broadcast Task"                   as UC_REBROAD
+  usecase "Cancel Task\n(with refund policy)"   as UC_CANCEL_HH
+  usecase "Delete Task\n(soft delete)"          as UC_DELETE
+  usecase "Confirm Match &\nPay Escrow (M-Pesa)" as UC_CONFIRM_PAY
+  usecase "View Start Code"                     as UC_START_CODE
+  usecase "Confirm Work\nComplete"              as UC_CONFIRM_DONE
+  usecase "Raise Dispute"                       as UC_DISPUTE_HH
+  usecase "Update Matching\nSettings"           as UC_HH_SETTINGS
+  usecase "Block / Unblock\nStudent"            as UC_BLOCK
+  usecase "Rate Student"                        as UC_RATE_ST
+  usecase "Send Message\nto Student"            as UC_MSG_HH
+}
+
+HH --> UC_POST
+HH --> UC_MY_TASKS
+HH --> UC_REBROAD
+HH --> UC_CANCEL_HH
+HH --> UC_DELETE
+HH --> UC_CONFIRM_PAY
+HH --> UC_START_CODE
+HH --> UC_CONFIRM_DONE
+HH --> UC_DISPUTE_HH
+HH --> UC_HH_SETTINGS
+HH --> UC_BLOCK
+HH --> UC_RATE_ST
+HH --> UC_MSG_HH
+
+UC_POST    ..> UC_MAP       : <<include>>
+UC_MAP     ..> UC_ADDR      : <<extend>>
+UC_MAP     ..> UC_GPS_HH    : <<extend>>
+UC_CONFIRM_PAY ..> UC_START_CODE : <<include>>
+
+' ═══════════════════════════════════════════════
+'  TASK MANAGEMENT (STUDENT)
+' ═══════════════════════════════════════════════
+
+package "Task Management — Student" #EAF7EF {
+  usecase "View Available\nTasks (Inbox)"     as UC_INBOX
+  usecase "View Task Detail"                  as UC_TASK_DETAIL
+  usecase "Accept Task\n(first-to-accept)"    as UC_ACCEPT
+  usecase "Decline Task"                      as UC_DECLINE
+  usecase "Ignore Task"                       as UC_IGNORE
+  usecase "Cancel Accepted\nTask"             as UC_CANCEL_ST
+  usecase "Check In\n(start code + GPS)"      as UC_CHECKIN
+  usecase "Retry Check-In\n(after flagged)"   as UC_RETRY_CI
+  usecase "Upload Before\nPhoto"              as UC_BEFORE_PHOTO
+  usecase "Mark Work\nFinished"               as UC_MARK_DONE
+  usecase "Upload After\nPhoto"               as UC_AFTER_PHOTO
+  usecase "Respond to\nDispute"               as UC_DISPUTE_ST
+  usecase "Rate Household"                    as UC_RATE_HH
+  usecase "Send Message\nto Household"        as UC_MSG_ST
+  usecase "View My Tasks"                     as UC_MY_TASKS_ST
+}
+
+ST --> UC_INBOX
+ST --> UC_TASK_DETAIL
+ST --> UC_ACCEPT
+ST --> UC_DECLINE
+ST --> UC_IGNORE
+ST --> UC_CANCEL_ST
+ST --> UC_CHECKIN
+ST --> UC_RETRY_CI
+ST --> UC_BEFORE_PHOTO
+ST --> UC_MARK_DONE
+ST --> UC_AFTER_PHOTO
+ST --> UC_DISPUTE_ST
+ST --> UC_RATE_HH
+ST --> UC_MSG_ST
+ST --> UC_MY_TASKS_ST
+
+UC_CHECKIN   ..> UC_CONSENT    : <<include>>
+UC_MARK_DONE ..> UC_AFTER_PHOTO : <<extend>>
+UC_CHECKIN   ..> UC_RETRY_CI   : <<extend>>
+
+' ═══════════════════════════════════════════════
+'  PAYMENTS & ESCROW
+' ═══════════════════════════════════════════════
+
+package "Payments & Escrow" #FEF9E7 {
+  usecase "Initiate STK Push\n(M-Pesa)"        as UC_STK
+  usecase "Receive Payment\nCallback"           as UC_CB
+  usecase "Hold Escrow"                         as UC_HOLD
+  usecase "Release Escrow\nto Student"          as UC_RELEASE
+  usecase "Refund Escrow\nto Household"         as UC_REFUND
+  usecase "Partial Refund"                      as UC_PARTIAL
+  usecase "View Transaction\nLedger"            as UC_LEDGER
+}
+
+HH          --> UC_STK
+UC_STK      --> MP         : STK Push request
+MP          --> UC_CB      : Payment callback
+UC_CB       ..> UC_HOLD    : <<include>>
+UC_CONFIRM_DONE ..> UC_RELEASE : <<include>>
+UC_CANCEL_HH    ..> UC_REFUND  : <<extend>>
+UC_CANCEL_ST    ..> UC_REFUND  : <<include>>
+
+HH --> UC_LEDGER
+AD --> UC_LEDGER
+
+' ═══════════════════════════════════════════════
+'  DISPUTES & ADMIN
+' ═══════════════════════════════════════════════
+
+package "Disputes & Admin Resolution" #FFE5E5 {
+  usecase "View Dispute\nLocation Audit Map"    as UC_AUDIT_MAP
+  usecase "Review Dispute\n(statements + chat)" as UC_REVIEW_DISP
+  usecase "Resolve Dispute\n(full/partial/release)" as UC_RESOLVE
+  usecase "Verify Student\nAccount"             as UC_VERIFY_ST
+  usecase "Manage Cancellation\nPolicy"         as UC_POL_CANCEL
+  usecase "Manage Location\nPolicy"             as UC_POL_LOC
+  usecase "View Audit Log"                      as UC_AUDIT_LOG
+}
+
+AD --> UC_AUDIT_MAP
+AD --> UC_REVIEW_DISP
+AD --> UC_RESOLVE
+AD --> UC_VERIFY_ST
+AD --> UC_POL_CANCEL
+AD --> UC_POL_LOC
+AD --> UC_AUDIT_LOG
+
+UC_DISPUTE_HH ..> UC_REVIEW_DISP : <<include>>
+UC_REVIEW_DISP ..> UC_AUDIT_MAP  : <<include>>
+UC_RESOLVE     ..> UC_RELEASE    : <<extend>>
+UC_RESOLVE     ..> UC_REFUND     : <<extend>>
+UC_RESOLVE     ..> UC_PARTIAL    : <<extend>>
+
+' ═══════════════════════════════════════════════
+'  AUTOMATED / SCHEDULED
+' ═══════════════════════════════════════════════
+
+package "Automated Jobs (Scheduler)" #F5DDFF {
+  usecase "Broadcast Task\nto Eligible Students"  as UC_BROADCAST
+  usecase "Re-broadcast Stale\nTasks"             as UC_STALE_REBROAD
+  usecase "Detect No-Show\n(30 min threshold)"    as UC_NOSHOW
+  usecase "Send Confirmation\nReminder (24h/40h)" as UC_REMINDER
+  usecase "Auto-Release Escrow\n(48h timeout)"    as UC_AUTO_RELEASE
+  usecase "Anonymise Check-In\nCoordinates"       as UC_ANON
+}
+
+SC --> UC_STALE_REBROAD
+SC --> UC_NOSHOW
+SC --> UC_REMINDER
+SC --> UC_AUTO_RELEASE
+SC --> UC_ANON
+
+UC_POST         ..> UC_BROADCAST       : <<include>>
+UC_REBROAD      ..> UC_BROADCAST       : <<include>>
+UC_NOSHOW       ..> UC_REFUND          : <<extend>>
+UC_AUTO_RELEASE ..> UC_RELEASE         : <<include>>
+
+' ═══════════════════════════════════════════════
+'  NOTIFICATIONS
+' ═══════════════════════════════════════════════
+
+package "Notifications" #F0F0F0 {
+  usecase "Receive Push\nNotification"           as UC_NOTIF
+  usecase "Mark Notifications\nAs Read"          as UC_NOTIF_READ
+  usecase "View Notification\nList"              as UC_NOTIF_LIST
+}
+
+HH --> UC_NOTIF_LIST
+HH --> UC_NOTIF_READ
+ST --> UC_NOTIF_LIST
+ST --> UC_NOTIF_READ
+
+UC_ACCEPT       ..> UC_NOTIF : <<include>>
+UC_CONFIRM_PAY  ..> UC_NOTIF : <<include>>
+UC_CHECKIN      ..> UC_NOTIF : <<include>>
+UC_MARK_DONE    ..> UC_NOTIF : <<include>>
+UC_CONFIRM_DONE ..> UC_NOTIF : <<include>>
+UC_DISPUTE_HH   ..> UC_NOTIF : <<include>>
+UC_RESOLVE      ..> UC_NOTIF : <<include>>
+UC_NOSHOW       ..> UC_NOTIF : <<include>>
+UC_AUTO_RELEASE ..> UC_NOTIF : <<include>>
+
+@enduml

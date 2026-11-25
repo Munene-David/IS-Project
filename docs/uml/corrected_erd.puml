@@ -1,0 +1,320 @@
+@startuml Corrected_ERD
+title UniTask — Entity Relationship Diagram
+
+skinparam backgroundColor #FFFFFF
+skinparam linetype ortho
+skinparam roundcorner 5
+skinparam shadowing false
+hide circle
+
+skinparam class {
+  BackgroundColor<<users>>      #D6EAF8
+  BorderColor<<users>>          #2980B9
+  HeaderBackgroundColor<<users>> #2980B9
+  HeaderFontColor<<users>>      #FFFFFF
+
+  BackgroundColor<<tasks>>      #D5F5E3
+  BorderColor<<tasks>>          #1E8449
+  HeaderBackgroundColor<<tasks>> #1E8449
+  HeaderFontColor<<tasks>>      #FFFFFF
+
+  BackgroundColor<<payments>>   #FDEBD0
+  BorderColor<<payments>>       #D68910
+  HeaderBackgroundColor<<payments>> #D68910
+  HeaderFontColor<<payments>>   #FFFFFF
+
+  BackgroundColor<<policy>>     #FADBD8
+  BorderColor<<policy>>         #C0392B
+  HeaderBackgroundColor<<policy>> #C0392B
+  HeaderFontColor<<policy>>     #FFFFFF
+}
+
+' ── USERS ──────────────────────────────────────────────────────
+entity "CustomUser" <<users>> {
+  *id          : INTEGER <<PK>>
+  --
+  *username    : VARCHAR(150)
+  *email       : VARCHAR(254)
+  *role        : VARCHAR(20)
+  *password    : VARCHAR(128)
+  phone_number : VARCHAR(20)
+  *is_active   : BOOLEAN
+  *created_at  : DATETIME
+}
+
+entity "StudentProfile" <<users>> {
+  *id                  : INTEGER <<PK>>
+  --
+  *user_id             : INTEGER <<FK>>
+  *university_id       : VARCHAR(50)
+  *university_name     : VARCHAR(150)
+  *verification_status : VARCHAR(20)
+  *availability_status : BOOLEAN
+  *categories_offered  : JSON
+  location_lat         : DECIMAL(9,6)
+  location_lng         : DECIMAL(9,6)
+  *cancellation_count  : INTEGER
+  *reliability_score   : FLOAT
+  *is_flagged          : BOOLEAN
+}
+
+entity "HouseholdProfile" <<users>> {
+  *id                  : INTEGER <<PK>>
+  --
+  *user_id             : INTEGER <<FK>>
+  address              : TEXT
+  location_lat         : DECIMAL(9,6)
+  location_lng         : DECIMAL(9,6)
+  *verification_status : VARCHAR(20)
+  *min_rating          : DECIMAL(3,1)
+  *search_radius_km    : DECIMAL(5,1)
+}
+
+entity "BlockedStudent" <<users>> {
+  *id           : INTEGER <<PK>>
+  --
+  *household_id : INTEGER <<FK>>
+  *student_id   : INTEGER <<FK>>
+  *created_at   : DATETIME
+}
+
+entity "Notification" <<users>> {
+  *id                : INTEGER <<PK>>
+  --
+  *recipient_id      : INTEGER <<FK>>
+  *notification_type : VARCHAR(30)
+  *title             : VARCHAR(200)
+  *message           : TEXT
+  *is_read           : BOOLEAN
+  task_id            : INTEGER
+  request_id         : INTEGER
+  *created_at        : DATETIME
+}
+
+entity "LocationConsent" <<users>> {
+  *id           : INTEGER <<PK>>
+  --
+  *student_id   : INTEGER <<FK>>
+  *version      : VARCHAR(20)
+  *consented_at : DATETIME
+}
+
+' ── TASKS ──────────────────────────────────────────────────────
+entity "Task" <<tasks>> {
+  *id                     : INTEGER <<PK>>
+  --
+  *household_owner_id     : INTEGER <<FK>>
+  assigned_student_id     : INTEGER <<FK>>
+  *title                  : VARCHAR(200)
+  *description            : TEXT
+  *category               : VARCHAR(100)
+  *posted_price           : DECIMAL(10,2)
+  recommended_price       : DECIMAL(10,2)
+  location_address        : VARCHAR(255)
+  location_lat            : DECIMAL(9,6)
+  location_lng            : DECIMAL(9,6)
+  location_landmark       : VARCHAR(200)
+  *geofence_radius_m      : INTEGER
+  *location_pin_confirmed : BOOLEAN
+  *status                 : VARCHAR(25)
+  scheduled_date          : DATE
+  scheduled_time          : TIME
+  *broadcast_round        : INTEGER
+  grace_window_deadline   : DATETIME
+  confirmation_deadline   : DATETIME
+  *is_deleted             : BOOLEAN
+  *created_at             : DATETIME
+  *updated_at             : DATETIME
+}
+
+entity "TaskCompletion" <<tasks>> {
+  *id                   : INTEGER <<PK>>
+  --
+  *task_id              : INTEGER <<FK>>
+  *start_code           : CHAR(4)
+  *start_code_verified  : BOOLEAN
+  arrived_at            : DATETIME
+  started_at            : DATETIME
+  finished_at           : DATETIME
+  checkin_lat           : DECIMAL(9,6)
+  checkin_lng           : DECIMAL(9,6)
+  before_photo          : VARCHAR
+  after_photo           : VARCHAR
+}
+
+entity "TaskRequest" <<tasks>> {
+  *id             : INTEGER <<PK>>
+  --
+  *task_id        : INTEGER <<FK>>
+  *student_id     : INTEGER <<FK>>
+  *status         : VARCHAR(20)
+  *sent_at        : DATETIME
+  responded_at    : DATETIME
+  *broadcast_round: INTEGER
+  rank_score      : DECIMAL(6,2)
+}
+
+entity "Message" <<tasks>> {
+  *id          : INTEGER <<PK>>
+  --
+  *task_id     : INTEGER <<FK>>
+  *sender_id   : INTEGER <<FK>>
+  *receiver_id : INTEGER <<FK>>
+  *content     : TEXT
+  *timestamp   : DATETIME
+  *is_read     : BOOLEAN
+}
+
+entity "CheckIn" <<tasks>> {
+  *id                   : INTEGER <<PK>>
+  --
+  *task_id              : INTEGER <<FK>>
+  *student_id           : INTEGER <<FK>>
+  *type                 : VARCHAR(10)
+  lat                   : DECIMAL(9,6)
+  lng                   : DECIMAL(9,6)
+  accuracy_m            : FLOAT
+  distance_m            : FLOAT
+  device_time           : DATETIME
+  *server_time          : DATETIME
+  time_skew_seconds     : INTEGER
+  *result               : VARCHAR(20)
+  *mock_location_flag   : BOOLEAN
+  *late_sync_flag       : BOOLEAN
+  *impossible_jump_flag : BOOLEAN
+  *device_info          : JSON
+  anonymised_at         : DATETIME
+}
+
+entity "Dispute" <<tasks>> {
+  *id                    : INTEGER <<PK>>
+  --
+  *task_id               : INTEGER <<FK>>
+  *raised_by_id          : INTEGER <<FK>>
+  *reason                : VARCHAR(30)
+  *description           : TEXT
+  student_response       : TEXT
+  student_responded_at   : DATETIME
+  resolved_by_id         : INTEGER <<FK>>
+  outcome                : VARCHAR(20)
+  partial_refund_amount  : DECIMAL(10,2)
+  admin_notes            : TEXT
+  resolved_at            : DATETIME
+  *created_at            : DATETIME
+}
+
+entity "AuditLog" <<tasks>> {
+  *id          : INTEGER <<PK>>
+  --
+  *task_id     : INTEGER <<FK>>
+  actor_id     : INTEGER <<FK>>
+  *action      : VARCHAR(20)
+  *from_status : VARCHAR(25)
+  *to_status   : VARCHAR(25)
+  *notes       : TEXT
+  *created_at  : DATETIME
+}
+
+entity "PriceGuide" <<tasks>> {
+  *id                 : INTEGER <<PK>>
+  --
+  *category           : VARCHAR(100)
+  *min_price          : DECIMAL(10,2)
+  *max_price          : DECIMAL(10,2)
+  *recommended_price  : DECIMAL(10,2)
+  description         : TEXT
+}
+
+' ── POLICY ─────────────────────────────────────────────────────
+entity "CancellationPolicy" <<policy>> {
+  *id                 : INTEGER <<PK>>
+  --
+  *free_before_hours  : INTEGER
+  *partial_refund_pct : INTEGER
+  *created_at         : DATETIME
+  *updated_at         : DATETIME
+}
+
+entity "LocationPolicy" <<policy>> {
+  *id                          : INTEGER <<PK>>
+  --
+  *allow_flagged_when_denied    : BOOLEAN
+  *retention_days               : INTEGER
+  *low_accuracy_threshold_m     : INTEGER
+  *max_time_skew_seconds        : INTEGER
+  *max_speed_mps                : INTEGER
+  *created_at                   : DATETIME
+  *updated_at                   : DATETIME
+}
+
+' ── PAYMENTS ───────────────────────────────────────────────────
+entity "Transaction" <<payments>> {
+  *id                  : INTEGER <<PK>>
+  --
+  *task_id             : INTEGER <<FK>>
+  *amount              : DECIMAL(10,2)
+  *status              : VARCHAR(20)
+  mpesa_reference      : VARCHAR(100)
+  checkout_request_id  : VARCHAR(100)
+  *phone_number        : VARCHAR(20)
+  *created_at          : DATETIME
+  *updated_at          : DATETIME
+}
+
+entity "TransactionLedger" <<payments>> {
+  *id                : INTEGER <<PK>>
+  --
+  *task_id           : INTEGER <<FK>>
+  *amount            : DECIMAL(10,2)
+  *transaction_type  : VARCHAR(20)
+  *status            : VARCHAR(15)
+  mpesa_reference    : VARCHAR(100)
+  *idempotency_key   : UUID
+  actor_id           : INTEGER <<FK>>
+  *notes             : TEXT
+  *created_at        : DATETIME
+}
+
+entity "Rating" <<payments>> {
+  *id            : INTEGER <<PK>>
+  --
+  *task_id       : INTEGER <<FK>>
+  *rater_id      : INTEGER <<FK>>
+  *rated_user_id : INTEGER <<FK>>
+  *score         : INTEGER
+  comment        : TEXT
+  *created_at    : DATETIME
+}
+
+' ── RELATIONSHIPS (crow's foot, no arrowheads) ─────────────────
+
+CustomUser     ||--o{  StudentProfile    : "1 user has\n0..1 student profile"
+CustomUser     ||--o{  HouseholdProfile  : "1 user has\n0..1 household profile"
+CustomUser     ||--o{  LocationConsent   : "1 user has\n0..1 consent"
+CustomUser     ||--o{  Notification      : "receives"
+CustomUser     ||--o{  BlockedStudent    : "blocks"
+CustomUser     ||--o{  BlockedStudent    : "is blocked by"
+CustomUser     ||--o{  Task              : "owns"
+CustomUser     ||--o{  Task              : "assigned to"
+CustomUser     ||--o{  TaskRequest       : "receives request"
+CustomUser     ||--o{  Message           : "sends"
+CustomUser     ||--o{  Message           : "receives"
+CustomUser     ||--o{  CheckIn           : "checks in"
+CustomUser     ||--o{  Dispute           : "raises"
+CustomUser     ||--o{  Dispute           : "resolves"
+CustomUser     ||--o{  Rating            : "rates"
+CustomUser     ||--o{  Rating            : "rated by"
+CustomUser     ||--o{  TransactionLedger : "ledger actor"
+CustomUser     ||--o{  AuditLog          : "audited by"
+
+Task           ||--o|  TaskCompletion    : "has completion"
+Task           ||--o|  Dispute           : "has dispute"
+Task           ||--o|  Transaction       : "has transaction"
+Task           ||--o{  TaskRequest       : "broadcast to"
+Task           ||--o{  Message           : "has messages"
+Task           ||--o{  CheckIn           : "has checkins"
+Task           ||--o{  TransactionLedger : "has ledger"
+Task           ||--o{  AuditLog          : "has audit log"
+Task           ||--o{  Rating            : "has ratings"
+
+@enduml

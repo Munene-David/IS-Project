@@ -1,9 +1,14 @@
 import { Platform } from 'react-native';
 
-// Android emulator uses 10.0.2.2 to reach host localhost.
-// Real Android/iOS devices on LAN need the PC's actual WiFi IP.
-// Update LAN_IP if your PC's IP changes (check with ipconfig).
-const LAN_IP = '192.168.0.34';
+// ─────────────────────────────────────────────────────────────
+// LAN IP is set in .env as EXPO_PUBLIC_LAN_IP.
+// Change it there whenever your Wi-Fi IP changes — no code edit needed.
+//
+// How to find your IP:
+//   Windows : ipconfig  → Wi-Fi IPv4 Address
+//   Mac/Linux: ifconfig → en0 inet
+// ─────────────────────────────────────────────────────────────
+const LAN_IP = process.env.EXPO_PUBLIC_LAN_IP ?? '192.168.0.34';
 
 export const API_BASE_URL = Platform.select({
   android: `http://${LAN_IP}:8000/api`,
