@@ -46,6 +46,7 @@ class Command(BaseCommand):
         self._handle_reminders(now)
         self._handle_auto_release(now)
         self._handle_location_retention(now)
+        self._handle_stale_broadcasts(now)
 
         self.stdout.write(self.style.SUCCESS('[run_scheduled_tasks] Done.'))
 
@@ -291,3 +292,41 @@ class Command(BaseCommand):
 
         if anonymised:
             self.stdout.write(f'  -> {anonymised} check-in location(s) anonymised (retention {policy.retention_days}d)')
+
+    # ----------------------------------------------------------------
+    # 5. Stale broadcast refresh
+    # ----------------------------------------------------------------
+    def _handle_stale_broadcasts(self, now):
+        """
+        Re-broadcast tasks that are stuck in Broadcasting or Posted with no
+        active requests — happens when the server restarts and daemon timers
+        are lost, or when all round-1/2 requests expired with no acceptance.
+
+        Skips students who declined or ignored. Re-opens expired requests.
+        """
+        from tasks.matching import rebroadcast_to_remaining
+        from tasks.models import TaskRequest
+
+        stale = Task.objects.filter(
+            status__in=['Broadcasting', 'Posted'],
+            is_deleted=False,
+        )
+
+        for task in stale:
+            # Check if there are any still-open (SENT/VIEWED) requests
+            open_reqs = TaskRequest.objects.filter(
+                task=task, status__in=['SENT', 'VIEWED']
+            ).count()
+
+            if open_reqs > 0:
+                continue  # still has active requests — not stale
+
+            reached = rebroadcast_to_remaining(task)
+            if reached > 0:
+                self.stdout.write(
+                    f'  -> Task #{task.id} "{task.title}": re-broadcast to {reached} student(s)'
+                )
+            else:
+                self.stdout.write(
+                    f'  -> Task #{task.id} "{task.title}": no new eligible students found'
+                )

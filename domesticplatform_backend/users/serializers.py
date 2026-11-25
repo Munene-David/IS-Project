@@ -78,6 +78,40 @@ class StudentRegisterSerializer(serializers.ModelSerializer):
         profile.university_name = university_name
         profile.save()
 
+        # Seed a 5.0 starting rating so new students are treated as trusted
+        # and receive broadcasts alongside high-rated students from day one.
+        # A system account acts as the rater; the rating is clearly labelled.
+        from payments.models import Rating
+        from tasks.models import Task, PriceGuide
+        system_hh, _ = CustomUser.objects.get_or_create(
+            username='_system',
+            defaults={
+                'email': '_system@platform.local',
+                'role': 'HOUSEHOLD',
+                'first_name': 'Platform',
+                'last_name': 'System',
+                'is_active': False,
+            }
+        )
+        # Create a minimal completed task to attach the rating to
+        seed_task = Task.objects.create(
+            household_owner=system_hh,
+            assigned_student=user,
+            title=f'_seed_{user.username}',
+            description='Seed rating task',
+            category='Cleaning',
+            posted_price=0,
+            location_pin_confirmed=False,
+            status='Completed',
+        )
+        Rating.objects.create(
+            task=seed_task,
+            rater=system_hh,
+            rated_user=user,
+            score=5,
+            comment='Starting rating — platform verified new member.',
+        )
+
         return user
 
 

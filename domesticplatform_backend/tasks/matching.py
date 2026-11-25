@@ -482,6 +482,87 @@ def _check_grace_window_expired(task_id):
 
 
 # ---------------------------------------------------------------------------
+# 6. Rebroadcast to remaining eligible students
+#    - Skips students who already DECLINED or IGNORED
+#    - Re-opens EXPIRED requests so those students get a fresh chance
+#    - Sends to brand-new eligible students who were never notified
+# ---------------------------------------------------------------------------
+
+def rebroadcast_to_remaining(task):
+    """
+    Push a fresh broadcast to every eligible student who has not explicitly
+    opted out (DECLINED / IGNORED) or already won (ACCEPTED / TAKEN).
+
+    Re-opens EXPIRED requests (timed-out round) and sends to new students.
+    Returns the number of students reached.
+    """
+    from .models import Task, TaskRequest
+    from users.notifications import Notification
+
+    task = Task.objects.get(pk=task.pk)
+
+    SKIP_STATUSES = {'DECLINED', 'IGNORED', 'ACCEPTED', 'TAKEN'}
+
+    # Re-open expired requests → give those students another chance
+    expired_qs = TaskRequest.objects.filter(task=task, status='EXPIRED')
+    reopened_ids = list(expired_qs.values_list('student_id', flat=True))
+    expired_qs.update(status='SENT')
+
+    # Find all eligible students at wide radius
+    ranked = find_eligible_students(task, radius_km=ROUND_2_RADIUS_KM,
+                                    min_rating=ROUND_2_MIN_RATING)
+
+    # Skip students who opted out or already won
+    skip_ids = set(
+        TaskRequest.objects.filter(task=task, status__in=SKIP_STATUSES)
+        .values_list('student_id', flat=True)
+    )
+    # Skip students who already have an active (non-expired) request
+    active_ids = set(
+        TaskRequest.objects.filter(task=task)
+        .exclude(status='EXPIRED')
+        .values_list('student_id', flat=True)
+    )
+
+    new_batch = [
+        (s, score, dist) for s, score, dist in ranked
+        if s.id not in skip_ids and s.id not in active_ids
+    ]
+
+    # Send to brand-new students
+    if new_batch:
+        next_round = (task.broadcast_round or 1) + 1
+        _send_requests_to_students(task, new_batch, broadcast_round=next_round)
+        task.broadcast_round = next_round
+        task.status = 'Broadcasting'
+        task.save(update_fields=['broadcast_round', 'status', 'updated_at'])
+
+    # Re-notify students whose EXPIRED requests were just reopened
+    for student_id in reopened_ids:
+        if student_id in skip_ids:
+            continue
+        try:
+            req = TaskRequest.objects.get(task=task, student_id=student_id)
+            from users.models import CustomUser
+            student = CustomUser.objects.get(pk=student_id)
+            Notification.send(
+                recipient=student,
+                notification_type='task_request',
+                title='Task available again!',
+                message=(
+                    f'A "{task.category}" task is still looking for a student: '
+                    f'"{task.title}" for KES {task.posted_price}. '
+                    f'Open Available Tasks to accept.'
+                ),
+                task_id=task.id,
+                request_id=req.id,
+            )
+        except Exception:
+            pass
+
+    total = len(new_batch) + len([i for i in reopened_ids if i not in skip_ids])
+    return total
+# ---------------------------------------------------------------------------
 # 4. Household cancellation within grace window
 # ---------------------------------------------------------------------------
 

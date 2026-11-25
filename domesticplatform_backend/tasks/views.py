@@ -1188,10 +1188,10 @@ class TaskViewSet(viewsets.ModelViewSet):
                 {'error': f'Cannot broadcast a task with status: {task.status}.'},
                 status=status.HTTP_400_BAD_REQUEST
             )
-        t = threading.Thread(target=matching.broadcast_task, args=[task])
+        t = threading.Thread(target=matching.rebroadcast_to_remaining, args=[task])
         t.daemon = True
         t.start()
-        return Response({'message': 'Task has been re-broadcast to eligible students.'})
+        return Response({'message': 'Task has been re-broadcast to eligible students (excluding those who declined or ignored).'})
 
     @action(detail=True, methods=['post'], url_path='confirm-match')
     def confirm_match(self, request, pk=None):

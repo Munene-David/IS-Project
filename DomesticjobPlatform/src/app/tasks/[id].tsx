@@ -200,6 +200,14 @@ export default function TaskDetailScreen() {
 
   useEffect(() => { fetchTaskDetail(); }, [id]);
 
+  // Force a refresh when a student lands on this screen so my_request is always fresh
+  useEffect(() => {
+    if (user?.role === 'STUDENT') {
+      const refresh = setTimeout(() => fetchTaskDetail(), 500);
+      return () => clearTimeout(refresh);
+    }
+  }, [id, user?.role]);
+
   // Students: load location-consent status and replay any check-ins that
   // were queued while offline (flagged server-side as late syncs).
   useEffect(() => {
@@ -494,10 +502,23 @@ export default function TaskDetailScreen() {
 
   // --- Broadcast flow handlers ---
 
-  const hasOpenRequest = !!task?.my_request && ['SENT', 'VIEWED'].includes(task.my_request.status);
-
   const handleAcceptRequest = async () => {
-    if (!task?.my_request) return;
+    // If we have a request id, use it. If navigated directly, find the request first.
+    let requestId = task?.my_request?.id;
+    if (!requestId) {
+      try {
+        const requests = await api.tasks.myRequests();
+        const match = requests.find((r: any) => r.task_id === task!.id);
+        if (!match) {
+          showAlert('Not available', 'This task is no longer available for you to accept.');
+          return;
+        }
+        requestId = match.id;
+      } catch {
+        showAlert('Error', 'Could not load your request. Please try from Available Tasks.');
+        return;
+      }
+    }
     const confirmed = await showConfirm(
       'Accept Task',
       'Accept this task? The household will be notified and has 10 minutes to confirm payment.'
@@ -505,7 +526,7 @@ export default function TaskDetailScreen() {
     if (!confirmed) return;
     setActingOnRequest(true);
     try {
-      await api.tasks.acceptRequest(task.my_request.id);
+      await api.tasks.acceptRequest(requestId);
       showAlert('🎉 You Got the Job!', 'The household will confirm payment within 10 minutes.');
       fetchTaskDetail();
     } catch (error: any) {
@@ -637,6 +658,11 @@ export default function TaskDetailScreen() {
   const isStudent = user?.role === 'STUDENT';
   const isAssignedStudent = Number(user?.id) === Number(task.assigned_student);
 
+  const hasOpenRequest = !!task?.my_request && ['SENT', 'VIEWED'].includes(task.my_request.status);
+  const canAcceptDirectly = isStudent && !isOwner && !isAssignedStudent &&
+    task?.status === 'Broadcasting' && !hasOpenRequest &&
+    !['ACCEPTED', 'DECLINED', 'TAKEN', 'IGNORED'].includes(task?.my_request?.status ?? '');
+
   const escrowLabel = task.escrow_status === 'Held'
     ? 'Escrow: Funds Secured'
     : `Escrow: ${task.escrow_status}`;
@@ -752,7 +778,7 @@ export default function TaskDetailScreen() {
       </View>
 
       {/* === Broadcast flow: Student invitation (accept / ignore / decline) === */}
-      {isStudent && hasOpenRequest && (
+      {isStudent && (hasOpenRequest || canAcceptDirectly) && (
         <View style={styles.card}>
           <Text style={styles.cardTitle}>📣 This Task Was Sent to You</Text>
           <Text style={styles.matchedInfo}>

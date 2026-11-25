@@ -167,23 +167,11 @@ export default function CreateTaskScreen() {
       Alert.alert('Error', 'Please enter a valid price');
       return;
     }
-    if (!pin) {
+    if (!pin && !locationAddress.trim()) {
       Alert.alert(
         'Location required',
-        'Please set the task location on the map — search for the address or use your current location, then adjust the pin.'
+        'Please enter a location address so students know where the task is.'
       );
-      return;
-    }
-    if (!locationAddress.trim()) {
-      Alert.alert(
-        'Address required',
-        'Please add a short address description for the pin (it was not filled automatically).'
-      );
-      return;
-    }
-    const radius = parsedGeofence();
-    if (radius == null || radius < 30 || radius > 1000) {
-      Alert.alert('Error', 'Check-in radius must be between 30 and 1000 metres.');
       return;
     }
 
@@ -214,29 +202,37 @@ export default function CreateTaskScreen() {
         category,
         posted_price: parseFloat(postedPrice),
         location_address: locationAddress.trim(),
-        location_lat: pin!.lat,
-        location_lng: pin!.lng,
-        location_pin_confirmed: true,
-        geofence_radius_m: parsedGeofence() ?? DEFAULT_GEOFENCE_M,
+        ...(pin ? {
+          location_lat: parseFloat(pin.lat.toFixed(6)),
+          location_lng: parseFloat(pin.lng.toFixed(6)),
+          location_pin_confirmed: true,
+          geofence_radius_m: parsedGeofence() ?? DEFAULT_GEOFENCE_M,
+        } : {
+          location_pin_confirmed: false,
+        }),
         ...(landmark.trim() ? { location_landmark: landmark.trim() } : {}),
         ...(scheduledDate ? { scheduled_date: formatDateForApi(scheduledDate) } : {}),
         ...(scheduledTime ? { scheduled_time: formatTimeForApi(scheduledTime) } : {}),
       };
 
       await api.tasks.create(taskData);
-      
-      Alert.alert(
-        'Success',
-        'Your task has been posted successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => goBack(),
-          },
-        ]
-      );
+
+      if (Platform.OS === 'web') {
+        window.alert('Your task has been posted! Students will be notified shortly.');
+        goBack();
+      } else {
+        Alert.alert(
+          'Task Posted!',
+          'Your task has been posted successfully! Eligible students nearby will be notified.',
+          [{ text: 'OK', onPress: () => goBack() }]
+        );
+      }
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create task');
+      if (Platform.OS === 'web') {
+        window.alert('Error: ' + (error.message || 'Failed to create task'));
+      } else {
+        Alert.alert('Error', error.message || 'Failed to create task');
+      }
     } finally {
       setLoading(false);
     }
