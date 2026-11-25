@@ -48,12 +48,24 @@ export default function InitiatePaymentScreen() {
       return;
     }
 
-    // Validate phone number format
     const cleanPhone = phoneNumber.replace(/\s+/g, '');
     if (!/^(254|0)[17]\d{8}$/.test(cleanPhone)) {
       Alert.alert('Error', 'Please enter a valid Kenyan phone number (e.g., 0712345678 or 254712345678)');
       return;
     }
+
+    // Confirm before sending real money
+    const confirmed = await new Promise<boolean>(resolve =>
+      Alert.alert(
+        'Confirm Payment',
+        `Send KES ${task?.posted_price} to escrow via M-Pesa?\n\nPhone: ${cleanPhone}\n\nYou will receive a prompt on your phone to enter your PIN.`,
+        [
+          { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+          { text: 'Send', style: 'default', onPress: () => resolve(true) },
+        ]
+      )
+    );
+    if (!confirmed) return;
 
     setProcessing(true);
     setPaymentStatus('pending');

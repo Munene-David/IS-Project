@@ -5,13 +5,21 @@ from .models import CustomUser, StudentProfile, HouseholdProfile, AdminProfile
 class StudentProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = StudentProfile
-        fields = ['university_id', 'university_name', 'verification_status', 'availability_status']
+        fields = [
+            'university_id', 'university_name', 'verification_status',
+            'availability_status', 'categories_offered',
+            'location_lat', 'location_lng',
+            'cancellation_count', 'reliability_score', 'is_flagged',
+        ]
 
 
 class HouseholdProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = HouseholdProfile
-        fields = ['address', 'location_lat', 'location_lng', 'verification_status']
+        fields = [
+            'address', 'location_lat', 'location_lng', 'verification_status',
+            'min_rating', 'search_radius_km',
+        ]
 
 
 class AdminProfileSerializer(serializers.ModelSerializer):

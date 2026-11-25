@@ -42,8 +42,25 @@ class StudentProfile(models.Model):
     availability_status = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Broadcast-matching fields
+    categories_offered = models.JSONField(default=list, blank=True)  # e.g. ["Cleaning", "Laundry"]
+    location_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    location_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    cancellation_count = models.IntegerField(default=0)
+    reliability_score = models.FloatField(default=1.0)  # ranking multiplier, lowered on cancellations
+    is_flagged = models.BooleanField(default=False)  # flagged to admin for repeated cancellations
+
     def __str__(self):
         return f"Student: {self.user.username} ({self.university_name})"
+
+    def record_cancellation(self):
+        """Lower reliability after a post-acceptance cancellation.
+        Three or more cancellations flags the account to the admin."""
+        self.cancellation_count += 1
+        self.reliability_score = max(0.3, self.reliability_score * 0.85)
+        if self.cancellation_count >= 3:
+            self.is_flagged = True
+        self.save(update_fields=['cancellation_count', 'reliability_score', 'is_flagged'])
 
 
 class HouseholdProfile(models.Model):
@@ -60,8 +77,25 @@ class HouseholdProfile(models.Model):
     verification_status = models.CharField(max_length=20, choices=VERIFICATION_CHOICES, default='Pending')
     created_at = models.DateTimeField(auto_now_add=True)
 
+    # Broadcast-matching settings
+    min_rating = models.DecimalField(max_digits=3, decimal_places=1, default=0)  # minimum student rating
+    search_radius_km = models.DecimalField(max_digits=5, decimal_places=1, default=5)  # default broadcast radius
+
     def __str__(self):
         return f"Household: {self.user.username} - {self.address[:30] if self.address else 'No address'}"
+
+
+class BlockedStudent(models.Model):
+    """A household's block list — blocked students are excluded from matching."""
+    household = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='blocked_students')
+    student = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='blocked_by')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('household', 'student')
+
+    def __str__(self):
+        return f"{self.household.username} blocked {self.student.username}"
 
 
 class AdminProfile(models.Model):
@@ -87,3 +121,9 @@ def create_user_profile(sender, instance, created, **kwargs):
 
 # Import Notification so it's part of this app's models
 from .notifications import Notification  # noqa: F401, E402
+
+
+__all__ = [
+    'CustomUser', 'StudentProfile', 'HouseholdProfile', 'AdminProfile',
+    'BlockedStudent', 'Notification',
+]

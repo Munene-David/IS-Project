@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, Alert, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
 import { api } from '@/services/api';
@@ -15,6 +15,16 @@ interface DashboardStats {
 export default function HomeScreen() {
   const router = useRouter();
   const { user, isLoading, logout } = useAuth();
+
+  const confirm = (title: string, msg: string): Promise<boolean> => {
+    if (Platform.OS === 'web') return Promise.resolve(window.confirm(`${title}\n\n${msg}`));
+    return new Promise(resolve =>
+      Alert.alert(title, msg, [
+        { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'OK', style: 'destructive', onPress: () => resolve(true) },
+      ])
+    );
+  };
   const [stats, setStats] = useState<DashboardStats>({
     activeBids: 0, completedTasks: 0, rating: 0, postedTasks: 0, activeTasks: 0,
   });
@@ -39,17 +49,20 @@ export default function HomeScreen() {
       }
 
       if (user.role === 'STUDENT') {
-        // Count tasks where this student has a bid
-        const myBidTasks = allTasks.filter((t: any) =>
-          t.bids?.some((b: any) => b.student_username === user.username)
+        // Count tasks assigned to this student or with active requests
+        const myTasks = allTasks.filter((t: any) =>
+          t.assigned_student === user.id ||
+          ['Broadcasting', 'Matched', 'Assigned', 'InProgress'].includes(t.status)
         );
-        const activeBids = myBidTasks.filter((t: any) =>
-          ['Posted', 'Bidding', 'Assigned', 'InProgress'].includes(t.status)
+        const activeRequests = myTasks.filter((t: any) =>
+          ['Broadcasting', 'Matched', 'Assigned', 'InProgress'].includes(t.status)
         ).length;
-        const completed = myBidTasks.filter((t: any) => t.status === 'Completed').length;
+        const completed = allTasks.filter((t: any) =>
+          t.assigned_student === user.id && t.status === 'Completed'
+        ).length;
 
         setStats({
-          activeBids,
+          activeBids: activeRequests,
           completedTasks: completed,
           rating: rating?.average_rating ?? 0,
           postedTasks: 0,
@@ -148,6 +161,8 @@ export default function HomeScreen() {
         <TouchableOpacity
           style={styles.logoutButton}
           onPress={async () => {
+            const ok = await confirm('Log out?', 'You will need to log in again to access your account.');
+            if (!ok) return;
             await logout();
             router.replace('/auth/login');
           }}
@@ -175,7 +190,7 @@ export default function HomeScreen() {
               {statsLoading ? <ActivityIndicator size="small" color="#007bff" /> : (
                 <Text style={styles.statNumber}>{stats.activeBids}</Text>
               )}
-              <Text style={styles.statLabel}>Active Bids</Text>
+              <Text style={styles.statLabel}>Active Tasks</Text>
             </View>
             <View style={styles.statCard}>
               {statsLoading ? <ActivityIndicator size="small" color="#007bff" /> : (
@@ -243,10 +258,10 @@ export default function HomeScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.actionButtonSecondary}
-            onPress={() => router.push('/my-bids' as any)}
+            style={[styles.actionButton, { backgroundColor: '#16a34a' }]}
+            onPress={() => router.push('/tasks/requests' as any)}
           >
-            <Text style={styles.actionButtonSecondaryText}>💼 My Bids</Text>
+            <Text style={styles.actionButtonText}>📥 Available Requests</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -296,6 +311,13 @@ export default function HomeScreen() {
           >
             <Text style={styles.actionButtonSecondaryText}>⚡ Active Tasks</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.actionButtonSecondary}
+            onPress={() => router.push('/settings' as any)}
+          >
+            <Text style={styles.actionButtonSecondaryText}>⚙️ Settings (Min Rating, Block List)</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -320,7 +342,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => router.push('/tasks' as any)}
+          onPress={() => router.push('/profile' as any)}
         >
           <Text style={styles.menuItemText}>👤 My Profile</Text>
           <Text style={styles.menuItemArrow}>›</Text>
@@ -328,7 +350,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => router.push('/tasks' as any)}
+          onPress={() => router.push('/my-ratings' as any)}
         >
           <Text style={styles.menuItemText}>⭐ My Ratings</Text>
           <Text style={styles.menuItemArrow}>›</Text>
@@ -336,7 +358,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.menuItem}
-          onPress={() => router.push('/tasks' as any)}
+          onPress={() => router.push('/payment-history' as any)}
         >
           <Text style={styles.menuItemText}>💰 Payment History</Text>
           <Text style={styles.menuItemArrow}>›</Text>

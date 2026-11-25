@@ -103,42 +103,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const login = async (identifier: string, pass: string) => {
-    setIsLoading(true);
-    try {
-      const res = await api.auth.login(identifier, pass);
-      await storage.setItem('auth_token', res.token);
-      setAuthToken(res.token);
-      setToken(res.token);
-      setUser(res.user);
-    } finally {
-      setIsLoading(false);
-    }
+    // Use local loading state in the calling screen — don't flip the global
+    // isLoading flag here, which would flash the full-screen spinner on the
+    // dashboard every time any button that calls login/register is pressed.
+    const res = await api.auth.login(identifier, pass);
+    await storage.setItem('auth_token', res.token);
+    setAuthToken(res.token);
+    setToken(res.token);
+    setUser(res.user);
   };
 
   const registerStudent = async (data: any) => {
-    setIsLoading(true);
-    try {
-      const res = await api.auth.registerStudent(data);
-      await storage.setItem('auth_token', res.token);
-      setAuthToken(res.token);
-      setToken(res.token);
-      setUser(res.user);
-    } finally {
-      setIsLoading(false);
-    }
+    const res = await api.auth.registerStudent(data);
+    await storage.setItem('auth_token', res.token);
+    setAuthToken(res.token);
+    setToken(res.token);
+    setUser(res.user);
   };
 
   const registerHousehold = async (data: any) => {
-    setIsLoading(true);
-    try {
-      const res = await api.auth.registerHousehold(data);
-      await storage.setItem('auth_token', res.token);
-      setAuthToken(res.token);
-      setToken(res.token);
-      setUser(res.user);
-    } finally {
-      setIsLoading(false);
-    }
+    const res = await api.auth.registerHousehold(data);
+    await storage.setItem('auth_token', res.token);
+    setAuthToken(res.token);
+    setToken(res.token);
+    setUser(res.user);
   };
 
   const logout = async () => {

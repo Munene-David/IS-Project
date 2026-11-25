@@ -77,6 +77,60 @@ class Command(BaseCommand):
             profile.university_id = 'UON/CS/2023/042'
             profile.university_name = 'University of Nairobi'
             profile.verification_status = 'Verified'
+            profile.categories_offered = ['Cleaning', 'Cooking', 'Laundry']
+            profile.location_lat = -1.2921
+            profile.location_lng = 36.7856
             profile.save()
+
+        # Additional students for broadcast demo
+        extra_students = [
+            {
+                'username': 'brian_k',
+                'email': 'brian.k@uon.ac.ke',
+                'first_name': 'Brian',
+                'last_name': 'Kiptoo',
+                'phone_number': '254720111222',
+                'university_id': 'UON/IT/2022/015',
+                'university_name': 'University of Nairobi',
+                'categories': ['Cleaning', 'Gardening'],
+                'lat': -1.2950,
+                'lng': 36.7800,
+            },
+            {
+                'username': 'mary_n',
+                'email': 'mary.n@ku.ac.ke',
+                'first_name': 'Mary',
+                'last_name': 'Njeri',
+                'phone_number': '254721333444',
+                'university_id': 'KU/ENG/2023/078',
+                'university_name': 'Kenyatta University',
+                'categories': ['Cleaning', 'Childcare'],
+                'lat': -1.2900,
+                'lng': 36.7900,
+            },
+        ]
+
+        for sd in extra_students:
+            student, created = CustomUser.objects.get_or_create(
+                username=sd['username'],
+                defaults={
+                    'email': sd['email'],
+                    'first_name': sd['first_name'],
+                    'last_name': sd['last_name'],
+                    'role': 'STUDENT',
+                    'phone_number': sd['phone_number'],
+                }
+            )
+            if created:
+                student.set_password('Student1234!')
+                student.save()
+                profile = student.student_profile
+                profile.university_id = sd['university_id']
+                profile.university_name = sd['university_name']
+                profile.verification_status = 'Verified'
+                profile.categories_offered = sd['categories']
+                profile.location_lat = sd['lat']
+                profile.location_lng = sd['lng']
+                profile.save()
 
         self.stdout.write(self.style.SUCCESS("Database seeded successfully!"))

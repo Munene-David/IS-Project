@@ -8,11 +8,20 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/context/AuthContext';
-import { api } from '@/services/api';
+import { api, PlaceResult } from '@/services/api';
 import { useGoBack } from '@/hooks/useGoBack';
+import DateTimePickerField from '@/components/date-time-picker-field';
+import { formatDateForApi, formatTimeForApi } from '@/components/date-time-picker-field.shared';
+import MapPicker from '@/components/map-picker';
+import { MapPin } from '@/components/map-picker.shared';
+import {
+  requestLocationPermission,
+  getCurrentLocationSnapshot,
+} from '@/services/location';
 
 const TASK_CATEGORIES = [
   'Cleaning',
@@ -24,6 +33,9 @@ const TASK_CATEGORIES = [
   'Other',
 ];
 
+/** Default geofence radius (metres) — must stay within 30–1000. */
+const DEFAULT_GEOFENCE_M = 150;
+
 export default function CreateTaskScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -34,8 +46,19 @@ export default function CreateTaskScreen() {
   const [category, setCategory] = useState('');
   const [postedPrice, setPostedPrice] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
+  const [scheduledDate, setScheduledDate] = useState<Date | null>(null);
+  const [scheduledTime, setScheduledTime] = useState<Date | null>(null);
   const [loading, setLoading] = useState(false);
   const [recommendedPrice, setRecommendedPrice] = useState<string | null>(null);
+
+  // --- Map pin location state ---
+  const [pin, setPin] = useState<MapPin | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<PlaceResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const [geofenceRadius, setGeofenceRadius] = useState(String(DEFAULT_GEOFENCE_M));
+  const [landmark, setLandmark] = useState('');
 
   // Redirect if not household owner
   useEffect(() => {
@@ -65,6 +88,67 @@ export default function CreateTaskScreen() {
     }
   };
 
+  // --- Map location handlers ---
+
+  const handleSearchAddress = async () => {
+    const q = searchQuery.trim();
+    if (!q) {
+      Alert.alert('Search', 'Type an address or area name first (e.g. "Kilimani, Nairobi").');
+      return;
+    }
+    setSearching(true);
+    setSearchResults([]);
+    try {
+      const data = await api.geo.searchPlaces(q);
+      if (!data.results?.length) {
+        Alert.alert('No matches', 'Try a nearby landmark or area name, e.g. "Yaya Centre, Nairobi".');
+      }
+      setSearchResults(data.results ?? []);
+    } catch (error: any) {
+      Alert.alert('Search failed', error.message || 'Address search is unavailable.');
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSelectPlace = (place: PlaceResult) => {
+    setPin({ lat: place.lat, lng: place.lng });
+    setLocationAddress(place.label);
+    setSearchResults([]);
+    setSearchQuery('');
+  };
+
+  const handleUseCurrentLocation = async () => {
+    setLocating(true);
+    try {
+      const granted = await requestLocationPermission();
+      if (!granted) {
+        Alert.alert('Permission needed', 'Allow location access so we can drop the pin where you are.');
+        return;
+      }
+      const snapshot = await getCurrentLocationSnapshot();
+      setPin({ lat: snapshot.lat, lng: snapshot.lng });
+      // Fill the address from the coordinates (best effort).
+      try {
+        const rev = await api.geo.reverseGeocode(snapshot.lat, snapshot.lng);
+        const label = rev.results?.[0]?.label;
+        if (label) setLocationAddress(label);
+      } catch {
+        // Reverse geocode unavailable — the household can type it instead.
+      }
+    } catch {
+      Alert.alert('Location unavailable', 'Could not read your GPS position. Try searching for the address instead.');
+    } finally {
+      setLocating(false);
+    }
+  };
+
+  const parsedGeofence = (): number | null => {
+    const value = parseInt(geofenceRadius, 10);
+    if (Number.isNaN(value)) return null;
+    return value;
+  };
+
   const handleCreateTask = async () => {
     // Validation
     if (!title.trim()) {
@@ -83,10 +167,44 @@ export default function CreateTaskScreen() {
       Alert.alert('Error', 'Please enter a valid price');
       return;
     }
-    if (!locationAddress.trim()) {
-      Alert.alert('Error', 'Please enter a location');
+    if (!pin) {
+      Alert.alert(
+        'Location required',
+        'Please set the task location on the map — search for the address or use your current location, then adjust the pin.'
+      );
       return;
     }
+    if (!locationAddress.trim()) {
+      Alert.alert(
+        'Address required',
+        'Please add a short address description for the pin (it was not filled automatically).'
+      );
+      return;
+    }
+    const radius = parsedGeofence();
+    if (radius == null || radius < 30 || radius > 1000) {
+      Alert.alert('Error', 'Check-in radius must be between 30 and 1000 metres.');
+      return;
+    }
+
+    // Confirm before posting
+    const confirmed = await new Promise<boolean>(resolve => {
+      if (Platform.OS === 'web') {
+        resolve(window.confirm(
+          `Post "${title.trim()}" for KES ${postedPrice}?\n\nEligible students nearby will be notified immediately.`
+        ));
+      } else {
+        Alert.alert(
+          'Post Task?',
+          `Post "${title.trim()}" for KES ${postedPrice}?\n\nEligible students nearby will be notified immediately.`,
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Post Task', style: 'default', onPress: () => resolve(true) },
+          ]
+        );
+      }
+    });
+    if (!confirmed) return;
 
     setLoading(true);
     try {
@@ -96,6 +214,13 @@ export default function CreateTaskScreen() {
         category,
         posted_price: parseFloat(postedPrice),
         location_address: locationAddress.trim(),
+        location_lat: pin!.lat,
+        location_lng: pin!.lng,
+        location_pin_confirmed: true,
+        geofence_radius_m: parsedGeofence() ?? DEFAULT_GEOFENCE_M,
+        ...(landmark.trim() ? { location_landmark: landmark.trim() } : {}),
+        ...(scheduledDate ? { scheduled_date: formatDateForApi(scheduledDate) } : {}),
+        ...(scheduledTime ? { scheduled_time: formatTimeForApi(scheduledTime) } : {}),
       };
 
       await api.tasks.create(taskData);
@@ -194,40 +319,149 @@ export default function CreateTaskScreen() {
               onChangeText={setPostedPrice}
             />
             <Text style={styles.hint}>
-              This is what you're willing to pay for this task.
+              This is what you&apos;re willing to pay for this task.
             </Text>
           </View>
 
           <View style={styles.formGroup}>
-            <Text style={styles.label}>Location *</Text>
+            <Text style={styles.label}>Task Location *</Text>
+            <Text style={styles.hint}>
+              Search for the address, drop the pin where the work happens, then
+              fine-tune it by dragging. Students only see the approximate area
+              until they accept and pay.
+            </Text>
+
+            {/* Address search */}
+            <View style={styles.searchRow}>
+              <TextInput
+                style={[styles.input, styles.searchInput]}
+                placeholder="e.g. Yaya Centre, Kilimani, Nairobi"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onSubmitEditing={handleSearchAddress}
+                returnKeyType="search"
+              />
+              <TouchableOpacity
+                style={[styles.searchButton, searching && styles.disabledButton]}
+                onPress={handleSearchAddress}
+                disabled={searching}
+              >
+                {searching
+                  ? <ActivityIndicator color="#fff" size="small" />
+                  : <Text style={styles.searchButtonText}>Search</Text>}
+              </TouchableOpacity>
+            </View>
+
+            {/* Map with draggable pin */}
+            <View style={styles.mapFrame}>
+              <MapPicker
+                pin={pin}
+                onPinChange={(p) => setPin(p)}
+                geofenceRadiusM={parsedGeofence()}
+                height={240}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[styles.currentLocationButton, locating && styles.disabledButton]}
+              onPress={handleUseCurrentLocation}
+              disabled={locating}
+            >
+              {locating
+                ? <ActivityIndicator color="#007bff" size="small" />
+                : <Text style={styles.currentLocationText}>📍 Use my current location</Text>}
+            </TouchableOpacity>
+
+            {/* Address text (auto-filled by search / current location) */}
             <TextInput
               style={styles.input}
-              placeholder="e.g., Kilimani, Nairobi"
+              placeholder="Address / area description"
               value={locationAddress}
               onChangeText={setLocationAddress}
+              multiline
+            />
+
+            {/* Search results */}
+            {searchResults.length > 0 && (
+              <View style={styles.resultsBox}>
+                {searchResults.map((place, i) => (
+                  <TouchableOpacity
+                    key={`${place.lat}-${place.lng}-${i}`}
+                    style={styles.resultRow}
+                    onPress={() => handleSelectPlace(place)}
+                  >
+                    <Text style={styles.resultText} numberOfLines={2}>
+                      📍 {place.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+
+            {/* Check-in geofence */}
+            <View style={styles.radiusRow}>
+              <Text style={styles.radiusLabel}>Check-in radius (m)</Text>
+              <TextInput
+                style={[styles.input, styles.radiusInput]}
+                placeholder="150"
+                keyboardType="numeric"
+                value={geofenceRadius}
+                onChangeText={setGeofenceRadius}
+              />
+            </View>
+            <Text style={styles.hint}>
+              Students must check in within this distance of the pin (30–1000 m,
+              default 150). The circle on the map shows the allowed area.
+            </Text>
+
+            {/* Landmark */}
+            <TextInput
+              style={styles.input}
+              placeholder="Landmark hint (optional), e.g. Blue gate next to Yaya"
+              value={landmark}
+              onChangeText={setLandmark}
             />
             <Text style={styles.hint}>
-              Enter the address where the task will be performed.
+              A landmark helps the student find the exact spot. Only shown after
+              they are assigned and have paid.
             </Text>
           </View>
+
+          <DateTimePickerField
+            label="Scheduled Date (Optional)"
+            mode="date"
+            value={scheduledDate}
+            onChange={setScheduledDate}
+            placeholder="Tap to pick a date"
+            minimumDate={new Date(new Date().setHours(0, 0, 0, 0))}
+          />
+
+          <DateTimePickerField
+            label="Scheduled Time (Optional)"
+            mode="time"
+            value={scheduledTime}
+            onChange={setScheduledTime}
+            placeholder="Tap to pick a time"
+            hint="Providing a date and time helps match you with available students."
+          />
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.infoTitle}>What happens next?</Text>
+          <Text style={styles.infoTitle}>How it works</Text>
           <Text style={styles.infoText}>
-            1. Your task will be visible to all students on the platform
+            1. Your task is broadcast to nearby, verified students automatically
           </Text>
           <Text style={styles.infoText}>
-            2. Students can submit bids with their proposed rates
+            2. The first student to accept gets the job — no manual selection
           </Text>
           <Text style={styles.infoText}>
-            3. You can review bids and select the best student
+            3. You have 10 minutes to confirm and pay via M-Pesa
           </Text>
           <Text style={styles.infoText}>
-            4. Once accepted, you'll deposit payment into escrow
+            4. Students only see the approximate area — the exact pin is shared after they accept and pay
           </Text>
           <Text style={styles.infoText}>
-            5. Student completes task and you release payment
+            5. Mark the task complete when done to release payment
           </Text>
         </View>
 
@@ -353,6 +587,86 @@ const styles = StyleSheet.create({
   categoryChipTextActive: {
     color: '#007bff',
     fontWeight: '600',
+  },
+  // Map location picker styles
+  searchRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  searchInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  searchButton: {
+    backgroundColor: '#007bff',
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 84,
+  },
+  searchButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  mapFrame: {
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#d0d0d0',
+    marginBottom: 8,
+  },
+  currentLocationButton: {
+    borderWidth: 1.5,
+    borderColor: '#007bff',
+    borderRadius: 8,
+    paddingVertical: 10,
+    alignItems: 'center',
+    marginBottom: 8,
+    backgroundColor: '#f0f7ff',
+  },
+  currentLocationText: {
+    color: '#007bff',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  resultsBox: {
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 8,
+    marginBottom: 8,
+    overflow: 'hidden',
+  },
+  resultRow: {
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+    backgroundColor: '#fafafa',
+  },
+  resultText: {
+    fontSize: 13,
+    color: '#333',
+  },
+  radiusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 4,
+  },
+  radiusLabel: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
+  radiusInput: {
+    width: 90,
+    marginBottom: 0,
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    borderColor: '#ccc',
   },
   infoTitle: {
     fontSize: 16,

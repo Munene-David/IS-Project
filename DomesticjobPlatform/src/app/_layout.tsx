@@ -43,9 +43,10 @@ function NavigatorStack() {
         <Stack.Screen name="tasks/index" />
         <Stack.Screen name="tasks/[id]" />
         <Stack.Screen name="tasks/create" />
+        <Stack.Screen name="tasks/requests" />
+        <Stack.Screen name="settings" />
         <Stack.Screen name="messages/[taskId]" />
         <Stack.Screen name="ratings/create" />
-        <Stack.Screen name="my-bids" />
         <Stack.Screen name="payments/initiate" />
         <Stack.Screen name="notifications" />
       </Stack>

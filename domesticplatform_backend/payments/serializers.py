@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Transaction, Rating
+from .models import Transaction, TransactionLedger, Rating
 
 
 class TransactionSerializer(serializers.ModelSerializer):
@@ -13,6 +13,19 @@ class TransactionSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at'
         ]
         read_only_fields = ['id', 'status', 'created_at', 'updated_at']
+
+
+class TransactionLedgerSerializer(serializers.ModelSerializer):
+    actor_username = serializers.CharField(source='actor.username', read_only=True, default=None)
+
+    class Meta:
+        model = TransactionLedger
+        fields = [
+            'id', 'task', 'amount', 'transaction_type', 'status',
+            'mpesa_reference', 'idempotency_key',
+            'actor', 'actor_username', 'notes', 'created_at',
+        ]
+        read_only_fields = ['id', 'task', 'created_at', 'idempotency_key']
 
 
 class RatingSerializer(serializers.ModelSerializer):

@@ -64,6 +64,28 @@ export default function CreateRatingScreen() {
       return;
     }
 
+    // Confirm before submitting — ratings cannot be edited
+    const isRatingStudentLocal = user?.id === task?.household_owner;
+    const ratedName = isRatingStudentLocal
+      ? task?.assigned_student_name
+      : task?.household_owner_name;
+
+    const confirmed = await new Promise<boolean>(resolve => {
+      if (Platform.OS === 'web') {
+        resolve(window.confirm(`Submit ${rating}★ rating for ${ratedName}?\n\nRatings cannot be changed after submission.`));
+      } else {
+        Alert.alert(
+          'Submit Rating',
+          `Submit ${rating}★ for ${ratedName}?\n\nRatings cannot be changed after submission.`,
+          [
+            { text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Submit', style: 'default', onPress: () => resolve(true) },
+          ]
+        );
+      }
+    });
+    if (!confirmed) return;
+
     setSubmitting(true);
     try {
       await api.ratings.create(
