@@ -24,7 +24,8 @@ class RegisterStudentView(APIView):
             return Response({
                 'token': token.key,
                 'user': UserSerializer(user).data,
-                'message': 'Student registered successfully'
+                'message': 'Student registered successfully',
+                'next': '/api/auth/me/'
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -40,7 +41,8 @@ class RegisterHouseholdView(APIView):
             return Response({
                 'token': token.key,
                 'user': UserSerializer(user).data,
-                'message': 'Household owner registered successfully'
+                'message': 'Household owner registered successfully',
+                'next': '/api/auth/me/'
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -72,6 +74,7 @@ class LoginView(APIView):
             return Response({
                 'token': token.key,
                 'user': UserSerializer(user).data,
+                'next': '/'  # redirect to site landing page
             })
         return Response(
             {'error': 'Invalid credentials'},
@@ -105,3 +108,32 @@ class MeView(APIView):
                 profile.save()
             return Response(UserSerializer(user).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class NotificationsView(APIView):
+    """Get all notifications for the logged-in user."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .notifications import Notification
+        notifications = Notification.objects.filter(recipient=request.user)[:50]
+        data = [
+            {
+                'id': n.id,
+                'type': n.notification_type,
+                'title': n.title,
+                'message': n.message,
+                'is_read': n.is_read,
+                'task_id': n.task_id,
+                'created_at': n.created_at.isoformat(),
+            }
+            for n in notifications
+        ]
+        unread_count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+        return Response({'notifications': data, 'unread_count': unread_count})
+
+    def patch(self, request):
+        """Mark all notifications as read."""
+        from .notifications import Notification
+        Notification.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+        return Response({'message': 'All notifications marked as read.'})

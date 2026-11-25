@@ -12,7 +12,7 @@ class CustomUser(AbstractUser):
     )
 
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='STUDENT')
-    phone_number = models.CharField(max_length=20, unique=True, null=True, blank=True)
+    phone_number = models.CharField(max_length=20, unique=False, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     def is_student(self):
@@ -83,3 +83,7 @@ def create_user_profile(sender, instance, created, **kwargs):
             HouseholdProfile.objects.create(user=instance)
         elif instance.role == 'ADMIN' and not hasattr(instance, 'admin_profile'):
             AdminProfile.objects.create(user=instance)
+
+
+# Import Notification so it's part of this app's models
+from .notifications import Notification  # noqa: F401, E402

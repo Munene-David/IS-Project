@@ -48,7 +48,7 @@ export default function RegisterStudentScreen() {
         university_name: universityName.trim(),
         university_id: universityId.trim(),
       });
-      router.replace('/');
+      // AuthGate in _layout.tsx handles redirect to home
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please check your details.');
     } finally {
@@ -168,7 +168,7 @@ export default function RegisterStudentScreen() {
 
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}>
+            onPress={() => router.replace('/auth/login' as any)}>
             <Text style={styles.backButtonText}>Already have an account? Log In</Text>
           </TouchableOpacity>
         </View>

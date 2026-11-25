@@ -42,17 +42,25 @@ class StudentRegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'password', 'first_name', 'last_name', 'phone_number', 'university_id', 'university_name']
+        fields = ['username', 'email', 'password', 'first_name', 'last_name',
+                  'phone_number', 'university_id', 'university_name']
+
+    def validate_phone_number(self, value):
+        if not value:
+            return value
+        # Students: phone number must be completely unique — no other user may have it
+        if CustomUser.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError(
+                "This phone number is already registered. Each user must have a unique phone number."
+            )
+        return value
 
     def create(self, validated_data):
         university_id = validated_data.pop('university_id')
         university_name = validated_data.pop('university_name')
         password = validated_data.pop('password')
 
-        user = CustomUser.objects.create(
-            role='STUDENT',
-            **validated_data
-        )
+        user = CustomUser.objects.create(role='STUDENT', **validated_data)
         user.set_password(password)
         user.save()
 
@@ -73,7 +81,20 @@ class HouseholdRegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = CustomUser
-        fields = ['username', 'email', 'password', 'first_name', 'last_name', 'phone_number', 'address', 'location_lat', 'location_lng']
+        fields = ['username', 'email', 'password', 'first_name', 'last_name',
+                  'phone_number', 'address', 'location_lat', 'location_lng']
+
+    def validate_phone_number(self, value):
+        if not value:
+            return value
+        # Household owners may share a phone number only with other HOUSEHOLD accounts.
+        # Block if the number is already used by a STUDENT or ADMIN.
+        conflicting = CustomUser.objects.filter(phone_number=value).exclude(role='HOUSEHOLD')
+        if conflicting.exists():
+            raise serializers.ValidationError(
+                "This phone number is already registered to a student or admin account."
+            )
+        return value
 
     def create(self, validated_data):
         address = validated_data.pop('address', '')
@@ -81,10 +102,7 @@ class HouseholdRegisterSerializer(serializers.ModelSerializer):
         location_lng = validated_data.pop('location_lng', None)
         password = validated_data.pop('password')
 
-        user = CustomUser.objects.create(
-            role='HOUSEHOLD',
-            **validated_data
-        )
+        user = CustomUser.objects.create(role='HOUSEHOLD', **validated_data)
         user.set_password(password)
         user.save()
 

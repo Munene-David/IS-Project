@@ -1,9 +1,14 @@
 import { Platform } from 'react-native';
 
-// In development, Android emulator uses 10.0.2.2, iOS / Web use localhost
+// Android emulator uses 10.0.2.2 to reach host localhost.
+// Real Android/iOS devices on LAN need the PC's actual WiFi IP.
+// Update LAN_IP if your PC's IP changes (check with ipconfig).
+const LAN_IP = '10.55.61.116';
+
 export const API_BASE_URL = Platform.select({
-  android: 'http://10.0.2.2:8000/api',
-  default: 'http://localhost:8000/api',
+  android: `http://${LAN_IP}:8000/api`,
+  ios: `http://${LAN_IP}:8000/api`,
+  default: 'http://localhost:8000/api', // web browser
 });
 
 let authToken: string | null = null;
@@ -157,6 +162,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ task_id: taskId }),
       }),
+    checkStatus: (checkoutRequestId: string) =>
+      request<any>('/payments/check-status/', {
+        method: 'POST',
+        body: JSON.stringify({ checkout_request_id: checkoutRequestId }),
+      }),
   },
 
   ratings: {
@@ -171,5 +181,10 @@ export const api = {
         }),
       }),
     getUserSummary: (userId: number) => request<any>(`/ratings/summary/${userId}/`),
+  },
+
+  notifications: {
+    list: () => request<{ notifications: any[]; unread_count: number }>('/notifications/'),
+    markAllRead: () => request<any>('/notifications/', { method: 'PATCH' }),
   },
 };

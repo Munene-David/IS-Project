@@ -34,7 +34,7 @@ export default function LoginScreen() {
     setError(null);
     try {
       await login(identifier.trim(), password);
-      router.replace('/');
+      // AuthGate in _layout.tsx automatically redirects to '/' once user is set
     } catch (err: any) {
       setError(err.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     padding: 24,
     justifyContent: 'center',
     alignItems: 'center',
-    minHeight: '100%',
+    flexGrow: 1,
   },
   card: {
     backgroundColor: '#FFFFFF',

@@ -48,7 +48,7 @@ export default function RegisterHouseholdScreen() {
         location_lat: -1.2921,
         location_lng: 36.7856,
       });
-      router.replace('/');
+      // AuthGate in _layout.tsx handles redirect to home
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please check your details.');
     } finally {
@@ -158,7 +158,7 @@ export default function RegisterHouseholdScreen() {
 
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => router.back()}>
+            onPress={() => router.replace('/auth/login' as any)}>
             <Text style={styles.backButtonText}>Already have an account? Log In</Text>
           </TouchableOpacity>
         </View>
