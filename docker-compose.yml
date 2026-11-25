@@ -1,31 +1,34 @@
-# docker-compose.yml
 version: '3.8'
 
 services:
   db:
     image: postgres:15-alpine
     restart: always
-    env_file:
-      - .env
     environment:
-      # Docker Compose reads these directly from the .env file to set up the database
-      POSTGRES_DB: postgres
-      POSTGRES_USER: ${Postrgres}
-      POSTGRES_PASSWORD: ${Munene123}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
   backend:
-    build: . # Assuming your Django Dockerfile is in the same directory
-    command: python manage.py runserver 0.0.0.0:8000
+    build:
+      context: ./domesticplatform_backend
+      dockerfile: DockerFile
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py seed_data &&
+             python manage.py runserver 0.0.0.0:8000"
     volumes:
-      - .:/app
+      - ./domesticplatform_backend:/app
     ports:
       - "8000:8000"
     env_file:
-      - .env # Injects all variables so Django's settings.py can access them via os.environ.get()
+      - .env
+    environment:
+      DB_HOST: db
     depends_on:
       - db
 
